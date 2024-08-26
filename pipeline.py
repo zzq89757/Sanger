@@ -1,7 +1,24 @@
 from Bio import SeqIO
 
-def trim_seq(seq:str):
-    ...
+def peak_evaluation():
+    
+
+
+def trim_seq_by_qual(seq_record, threshold=20):
+    # 获取序列的质量分数
+    qual_scores = seq_record.letter_annotations["phred_quality"]
+    
+    # 找到第一个质量低于阈值的位置
+    trim_position = len(qual_scores)
+    for i, score in enumerate(qual_scores):
+        if score < threshold:
+            trim_position = i
+            break
+    
+    # 修剪序列和质量分数
+    seq_record.seq = seq_record.seq[:trim_position]
+    seq_record.letter_annotations["phred_quality"] = qual_scores[:trim_position]
+    return seq_record
 
 
 def parse_abi_file(file_path:str) -> None:
@@ -12,8 +29,9 @@ def parse_abi_file(file_path:str) -> None:
         data_a = list(abif_raw["DATA10"])
         data_t = list(abif_raw["DATA11"])
         data_c = list(abif_raw["DATA12"])
-
-        print(data_g)
+        trimmed_record = trim_seq_by_qual(seq)
+        print(trimmed_record.seq)
+        print(trimmed_record.letter_annotations['phred_quality'])
 
 
 def main() -> None:
