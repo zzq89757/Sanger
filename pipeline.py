@@ -1,10 +1,16 @@
 from Bio import SeqIO
 
 def peak_evaluation():
+    '''检测重叠峰'''
     ...
+
+def trim_static(seq_record, start:int=50, end:int=800):
+    '''固定保留50-800部分'''
+    
 
 
 def trim_seq_by_qual(seq_record, threshold=20):
+    '''根据质量值截取序列'''
     # 获取序列的质量分数
     qual_scores = seq_record.letter_annotations["phred_quality"]
     
