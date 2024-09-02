@@ -4,22 +4,30 @@ from os import system
 import pandas as pd
 
 
+
 def parse_fq_ref_map_table() -> defaultdict:
     '''将下机数据与其对应参考的映射关系存入字典'''
 
 
-def extract_sgRNA(sg_table:str, target_gene_table:str) -> defaultdict:
-    '''根据sgRNA序列表及目标基因表生成每个well对应的sgRNA'''
+def extract_sgRNA(sg_table:str, ref_path:str) -> defaultdict:
+    '''根据sgRNA序列表生成每个plate->well对应的sgRNA'''
+    well_sg_dict = defaultdict(lambda:defaultdict(lambda :[''] * 4))
     sg_df = pd.read_excel(sg_table)
-    tg_df = pd.read_excel(target_gene_table)
-    print(sg_df)
+    # print(sg_df.head())
+    # extracat sgRNA and generate reference
+    for plate_str, well, sgn_seq in zip(sg_df['Plate #'], sg_df['Well #'], sg_df['sgRNA sequence']):
+        plate, sg_idx = plate_str.split("_sg")
+        well_sg_dict[plate][well][int(sg_idx) - 1] = sgn_seq
+    print(well_sg_dict)    
     
     
 
-def generate_ref(vector_seq:str, sg_table:str, target_gene_table:str) -> None:
+def generate_ref(vector_seq:str, sg_table:str) -> None:
     '''根据原始载体和sgRNA序列表及目标基因表生成不同的参考文件'''
     # get each well's sgRNA by sg_table and target_gene_table
-    ref_dict = extract_sgRNA(sg_table, target_gene_table)
+    ref_dict = extract_sgRNA(sg_table, ref_path)
+    # construct index
+    system(f"bwa index {ref_file}")
 
 def peak_evaluation():
     '''检测下机数据重叠峰'''
@@ -67,13 +75,18 @@ def data_from_abi(file_path:str) -> defaultdict:
         data_dict[seq_id]['qual'] = trimmed_qual
     return data_dict
 
+def process_alignment_result():
+    ...
+    
+
+
 def align2ref(ref_file:str, data_dict:defaultdict) -> None:
     '''构建参考序列索引并将下机数据比对到参考'''
-    # construct index
-    system(f"bwa index {ref_file}")
-    # alignment by bwa
-    # fq_str = f"@{}"
-    # system(f"echo -e "@{data_dict}" ")
+    
+    # alignment by bwa and fetch alignment result
+    # fq_str = f"@{seq}\n+\n{qual}"
+    # system(f"echo -e "{fq_str}" | bwa mem -t 24 {ref_file} /dev/stdin ")
+    # process alignment result
     ...
 
 
@@ -81,7 +94,7 @@ def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
     data_dict = data_from_abi(input_file)
     # print(data_dict)
-    extract_sgRNA("/home/wayne/Project/SC/Sanger/data_WellxWell_T_CRISPRko_板孔位信息.xlsx","/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx")
+    extract_sgRNA("/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx")
     
 
 if __name__ == "__main__":
