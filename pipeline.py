@@ -1,13 +1,25 @@
 from collections import defaultdict
-from Bio import SeqIO,Align
+from Bio import SeqIO, Align
+from os import system
+import pandas as pd
 
 
 def parse_fq_ref_map_table() -> defaultdict:
     '''将下机数据与其对应参考的映射关系存入字典'''
 
-def generate_ref(vector_seq:str, sg_table:str):
-    '''根据原始载体和sgRNA序列生成不同的参考文件'''
-    ...
+
+def extract_sgRNA(sg_table:str, target_gene_table:str) -> defaultdict:
+    '''根据sgRNA序列表及目标基因表生成每个well对应的sgRNA'''
+    sg_df = pd.read_excel(sg_table)
+    tg_df = pd.read_excel(target_gene_table)
+    print(sg_df)
+    
+    
+
+def generate_ref(vector_seq:str, sg_table:str, target_gene_table:str) -> None:
+    '''根据原始载体和sgRNA序列表及目标基因表生成不同的参考文件'''
+    # get each well's sgRNA by sg_table and target_gene_table
+    ref_dict = extract_sgRNA(sg_table, target_gene_table)
 
 def peak_evaluation():
     '''检测下机数据重叠峰'''
@@ -57,16 +69,19 @@ def data_from_abi(file_path:str) -> defaultdict:
 
 def align2ref(ref_file:str, data_dict:defaultdict) -> None:
     '''构建参考序列索引并将下机数据比对到参考'''
-    from os import system
+    # construct index
     system(f"bwa index {ref_file}")
+    # alignment by bwa
+    # fq_str = f"@{}"
+    # system(f"echo -e "@{data_dict}" ")
     ...
-
 
 
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
     data_dict = data_from_abi(input_file)
-    print(data_dict)
+    # print(data_dict)
+    extract_sgRNA("/home/wayne/Project/SC/Sanger/data_WellxWell_T_CRISPRko_板孔位信息.xlsx","/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx")
     
 
 if __name__ == "__main__":
