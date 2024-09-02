@@ -1,4 +1,5 @@
-from Bio import SeqIO
+from collections import defaultdict
+from Bio import SeqIO,Align
 
 def peak_evaluation():
     '''检测重叠峰'''
@@ -6,6 +7,7 @@ def peak_evaluation():
 
 def trim_static(seq_record, start:int=50, end:int=800):
     '''固定保留50-800部分'''
+    return seq_record.seq[50:800],seq_record.letter_annotations["phred_quality"][50:800]
     
 
 
@@ -27,22 +29,32 @@ def trim_seq_by_qual(seq_record, threshold=20):
     return seq_record
 
 
-def parse_abi_file(file_path:str) -> None:
+def data_from_abi(file_path:str) -> defaultdict:
+    data_dict = defaultdict(lambda:defaultdict())
     for seq in SeqIO.parse(file_path,"abi"):
-        seq_id, sequence, qual_array = seq.name, seq.seq, seq.letter_annotations['phred_quality']
+        seq_id= seq.name
+        # base signal
         abif_raw = seq.annotations["abif_raw"]
         data_g = list(abif_raw["DATA9"])
         data_a = list(abif_raw["DATA10"])
         data_t = list(abif_raw["DATA11"])
         data_c = list(abif_raw["DATA12"])
-        trimmed_record = trim_seq_by_qual(seq)
-        print(trimmed_record.seq)
-        print(trimmed_record.letter_annotations['phred_quality'])
+        # trimmed_record = trim_seq_by_qual(seq)
+        # trim seq and qual,storage in dict
+        trimmed_seq, trimmed_qual = trim_static(seq)
+        data_dict[seq_id]['seq'] = trimmed_seq
+        data_dict[seq_id]['qual'] = trimmed_qual
+    return data_dict
+
+def align2ref():
+    ...
+
 
 
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
-    parse_abi_file(input_file)
+    data_dict = data_from_abi(input_file)
+    print(data_dict)
     
 
 if __name__ == "__main__":
