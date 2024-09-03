@@ -6,9 +6,6 @@ from pysam import AlignedSegment
 
 
 
-def parse_fq_ref_map_table() -> defaultdict:
-    '''将下机数据与其对应参考的映射关系存入字典'''
-    ...
     
 def recognized_well_by_file_name(file_name:str = "HA-1-4-B-6") -> int:
     '''根据文件名对应的子板及孔位获取拆分前的孔号'''
