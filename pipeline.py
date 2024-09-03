@@ -1,5 +1,5 @@
 from collections import defaultdict
-from Bio import SeqIO, Align
+from Bio import SeqIO
 from os import system
 import pandas as pd
 
@@ -7,27 +7,39 @@ import pandas as pd
 
 def parse_fq_ref_map_table() -> defaultdict:
     '''将下机数据与其对应参考的映射关系存入字典'''
+    ...
 
 
-def extract_sgRNA(sg_table:str, ref_path:str) -> defaultdict:
-    '''根据sgRNA序列表生成每个plate->well对应的sgRNA'''
-    well_sg_dict = defaultdict(lambda:defaultdict(lambda :[''] * 4))
+def generate_ref(sg_table:str, vector_seq:str, ref_path:str) -> defaultdict:
+    '''根据sgRNA序列表生成每个plate->well对应的reference'''
+    # read sg seq table
     sg_df = pd.read_excel(sg_table)
-    # print(sg_df.head())
-    # extracat sgRNA and generate reference
-    for plate_str, well, sgn_seq in zip(sg_df['Plate #'], sg_df['Well #'], sg_df['sgRNA sequence']):
+
+    # extracat raw vector seq
+    vector_seq:str
+    for v in SeqIO.parse(vector_seq,'fasta'):vector_seq = str(v.seq)
+    vector_li = vector_seq.split("N" * 20)
+    
+    # generate reference by sg df and raw vector seq
+    idx = 1
+    tmp_li = [''] * 5
+    for plate_str, well, sgn_seq, ori in zip(sg_df['Plate #'], sg_df['Well #'], sg_df['sgRNA sequence'], sg_df['Strand']):
         plate, sg_idx = plate_str.split("_sg")
-        well_sg_dict[plate][well][int(sg_idx) - 1] = sgn_seq
-    print(well_sg_dict)    
+        tmp_li[int(sg_idx) - 1] = vector_li[int(sg_idx) - 1] + sgn_seq
+        if idx % 4 == 0:
+            tmp_li[4] = vector_li[4]
+            # storage finished,join and output as reference file
+            well_ref = ''.join(tmp_li)
+            out_ref = open(f"{ref_path}/{plate}_{well}.fa",'w')
+            out_ref.write(f">{plate}_{well}\n{well_ref}\n")
+            # construct index
+            system(f"bwa index {ref_path}/{plate}_{well}.fa")
+            tmp_li = [''] * 5
+        idx += 1  
     
     
 
-def generate_ref(vector_seq:str, sg_table:str) -> None:
-    '''根据原始载体和sgRNA序列表及目标基因表生成不同的参考文件'''
-    # get each well's sgRNA by sg_table and target_gene_table
-    ref_dict = extract_sgRNA(sg_table, ref_path)
-    # construct index
-    system(f"bwa index {ref_file}")
+    
 
 def peak_evaluation():
     '''检测下机数据重叠峰'''
@@ -75,9 +87,6 @@ def data_from_abi(file_path:str) -> defaultdict:
         data_dict[seq_id]['qual'] = trimmed_qual
     return data_dict
 
-def process_alignment_result():
-    ...
-    
 
 
 def align2ref(ref_file:str, data_dict:defaultdict) -> None:
@@ -88,13 +97,18 @@ def align2ref(ref_file:str, data_dict:defaultdict) -> None:
     # system(f"echo -e "{fq_str}" | bwa mem -t 24 {ref_file} /dev/stdin ")
     # process alignment result
     ...
+    
 
+def process_alignment_result():
+    ...
+    
 
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
     data_dict = data_from_abi(input_file)
     # print(data_dict)
-    extract_sgRNA("/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx")
+    # extract_sgRNA("/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx","raw_vector.fa","./")
+    generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
     
 
 if __name__ == "__main__":
