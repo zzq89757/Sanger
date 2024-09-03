@@ -1,6 +1,5 @@
 from collections import defaultdict
 from Bio import SeqIO
-from os import system, popen
 import subprocess
 import pandas as pd
 
@@ -38,7 +37,7 @@ def generate_ref(sg_table:str, vector_seq:str, ref_path:str) -> defaultdict:
             out_ref = open(f"{ref_path}/{plate}_{well}.fa",'w')
             out_ref.write(f">{plate}_{well}\n{well_ref}\n")
             # construct index
-            system(f"bwa index {ref_path}/{plate}_{well}.fa")
+            subprocess.run(f"bwa index {ref_path}/{plate}_{well}.fa", shell=True)
             tmp_li = [''] * 5
         idx += 1  
     
@@ -112,8 +111,6 @@ def process_align(ref_file:str, fq_str:str) -> None:
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
     fq_str = fq_from_abi(input_file)
-    # print(data_dict)
-    # extract_sgRNA("/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx","raw_vector.fa","./")
     # generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
     process_align("raw_vector.fa", fq_str)
     
