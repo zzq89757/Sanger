@@ -1,12 +1,17 @@
 from collections import defaultdict
 from Bio import SeqIO
-from os import system
+from os import system, popen
+import subprocess
 import pandas as pd
 
 
 
 def parse_fq_ref_map_table() -> defaultdict:
     '''将下机数据与其对应参考的映射关系存入字典'''
+    ...
+    
+def recognized_ref_by_file_name(file_name:str) -> str:
+    '''识别文件名对应的参考序列文件'''
     ...
 
 
@@ -47,7 +52,8 @@ def peak_evaluation():
 
 def trim_static(seq_record, start:int=50, end:int=800):
     '''裁剪下机数据，固定保留50-800部分'''
-    return seq_record.seq[50:800],seq_record.letter_annotations["phred_quality"][50:800]
+    # return seq_record.seq[50:800], seq_record.letter_annotations["phred_quality"][50:800]
+    return seq_record.seq[50:800], "F"*750
     
 
 
@@ -69,9 +75,9 @@ def trim_seq_by_qual(seq_record, threshold=20):
     return seq_record
 
 
-def data_from_abi(file_path:str) -> defaultdict:
-    '''读取ab1文件并将序列信息存入字典'''
-    data_dict = defaultdict(lambda:defaultdict())
+def fq_from_abi(file_path:str) -> defaultdict:
+    '''读取ab1文件并将序列信息存入fq格式字符串'''
+    fq_str = ""
     for seq in SeqIO.parse(file_path,"abi"):
         seq_id= seq.name
         # base signal
@@ -83,32 +89,33 @@ def data_from_abi(file_path:str) -> defaultdict:
         # trimmed_record = trim_seq_by_qual(seq)
         # trim seq and qual,storage in dict
         trimmed_seq, trimmed_qual = trim_static(seq)
-        data_dict[seq_id]['seq'] = trimmed_seq
-        data_dict[seq_id]['qual'] = trimmed_qual
-    return data_dict
+        fq_str = f"@{seq_id}\n{trimmed_seq}\n+\n{trimmed_qual}"
+    return fq_str
 
 
-
-def align2ref(ref_file:str, data_dict:defaultdict) -> None:
-    '''构建参考序列索引并将下机数据比对到参考'''
+def parse_alignment_result(aln_res_str:str):
+    ...
     
+    
+
+def process_align(ref_file:str, fq_str:str) -> None:
+    '''将下机数据比对到参考并处理结果'''
     # alignment by bwa and fetch alignment result
-    # fq_str = f"@{seq}\n+\n{qual}"
-    # system(f"echo -e "{fq_str}" | bwa mem -t 24 {ref_file} /dev/stdin ")
+    res = subprocess.Popen(f"echo -e \"{fq_str}\" | bwa mem -t 24 {ref_file} /dev/stdin",shell=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    aln_res_str = str(res.stdout.read(),"utf-8").rstrip().split("\n")[-1]
     # process alignment result
-    ...
+    parse_alignment_result(aln_res_str)
     
 
-def process_alignment_result():
-    ...
     
 
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
-    data_dict = data_from_abi(input_file)
+    fq_str = fq_from_abi(input_file)
     # print(data_dict)
     # extract_sgRNA("/home/wayne/Project/SC/Sanger/CRISPRko_Aguzzi_WithWell_序列信息.xlsx","raw_vector.fa","./")
-    generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
+    # generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
+    process_align("raw_vector.fa", fq_str)
     
 
 if __name__ == "__main__":
