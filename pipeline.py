@@ -2,6 +2,7 @@ from collections import defaultdict
 from Bio import SeqIO
 import subprocess
 import pandas as pd
+from pysam import AlignedSegment
 
 
 
@@ -9,9 +10,32 @@ def parse_fq_ref_map_table() -> defaultdict:
     '''将下机数据与其对应参考的映射关系存入字典'''
     ...
     
-def recognized_ref_by_file_name(file_name:str) -> str:
-    '''识别文件名对应的参考序列文件'''
-    ...
+def recognized_well_by_file_name(file_name:str = "HA-1-4-B-6") -> int:
+    '''根据文件名对应的子板及孔位获取拆分前的孔号'''
+
+    sub_dict = defaultdict(list)
+    
+    for i in range(1, 17):
+        for j in range(1, 25):
+            if i % 2 == 1:
+                if j % 2 == 1:
+                    sub_dict['1'].append((i - 1) * 24 + j)
+                else:
+                    sub_dict['2'].append((i - 1) * 24 + j)
+            else:
+                if j % 2 == 1:
+                    sub_dict['3'].append((i - 1) * 24 + j)
+                else:
+                    sub_dict['4'].append((i - 1) * 24 + j)
+    
+
+    subplate, raw_num, col_num = file_name.split("-")[-3:]
+    raw_num = ord(raw_num) - 65
+    sub_well_idx = raw_num * 12 + int(col_num) - 1
+    well = sub_dict[subplate][sub_well_idx]
+    return well
+    
+        
 
 
 def generate_ref(sg_table:str, vector_seq:str, ref_path:str) -> defaultdict:
@@ -92,8 +116,12 @@ def fq_from_abi(file_path:str) -> defaultdict:
     return fq_str
 
 
+
 def parse_alignment_result(aln_res_str:str):
-    ...
+    a = AlignedSegment()
+    a.flag = 4
+    a.cigarstring = "47M150S"
+    print(a.get_cigar_stats())
     
     
 
@@ -110,8 +138,10 @@ def process_align(ref_file:str, fq_str:str) -> None:
 
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
-    fq_str = fq_from_abi(input_file)
     # generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
+    well = recognized_well_by_file_name()
+    ref_file = f"{plate}_{well}.fa"
+    fq_str = fq_from_abi(input_file)
     process_align("raw_vector.fa", fq_str)
     
 
