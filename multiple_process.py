@@ -125,10 +125,10 @@ def fq_from_abi(file_path:str) -> defaultdict:
 
 
 
-def extract_data(well_fq_file_dict:defaultdict) -> None:
+def extract_data(well_fq_file_dict:defaultdict, output_fq_path:str) -> None:
     '''提取每个well中的序列信息并将属于同一个well的序列存为fq'''
     for well, file_li in well_fq_file_dict.items():
-        output_handle = open(f"{well}_trimed.fq",'w')
+        output_handle = open(f"{output_fq_path}/{well}_trimed.fq",'w')
         for file in file_li:
             fq_str = fq_from_abi(file)
             output_handle.write(fq_str)
@@ -139,7 +139,7 @@ def detective_alignment_result():
     ...
     
     
-def process_alignment(ref_file:str, input_fq:str, output_bam:str, sg_pos_li):
+def process_alignment(ref_file:str, input_fq:str, output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
     '''执行bwa命令后处理bam文件'''
     # alignment by bwa and fetch alignment result
     res = subprocess.Popen(f"bwa mem -t 24 {ref_file} {input_fq} > ",shell=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -156,9 +156,12 @@ def main():
     generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx",vector_li,"./newref/")
     # process alignment
     file_dict = classify_file_by_well("/home/wayne/Project/SC/Sanger/")
-    input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
-    well = recognized_well_by_file_name()
-    plate = 0
-    ref_file = f"{plate}_{well}.fa"
-    fq_str = fq_from_abi(input_file)
-    process_align("raw_vector.fa", fq_str, sg_pos_li)
+    output_fq_path="./fq/"
+    extract_data(file_dict,output_fq_path)
+    well_li = [str(x).split("_")[0] for x in Path(output_fq_path).glob("*fq")]
+    well_qc_dict = defaultdict(list)
+    for well in well_li:
+        ref_file = ""
+        input_fq = ""
+        output_bam = ""
+        process_alignment()
