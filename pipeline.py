@@ -32,18 +32,30 @@ def recognized_well_by_file_name(file_name:str = "HA-1-4-B-6") -> int:
     well = sub_dict[subplate][sub_well_idx]
     return well
     
+
+def cut_seq_obtain_pos(vector_seq:str) -> list:
+    for v in SeqIO.parse(vector_seq,'fasta'):vector_seq = str(v.seq)
+    vector_li = vector_seq.split("N" * 20)
+    # record sgRNA pos by strlen  
+    sg_pos_li = []
+    front_length = 0
+    for i,v in enumerate(vector_li):
+        if i == 4:continue
+        pos = len(v) 
+        front_length += pos
+        sg_pos_li.append(front_length)
+        front_length += 20
         
+        
+    return sg_pos_li , vector_li
 
-
-def generate_ref(sg_table:str, vector_seq:str, ref_path:str) -> defaultdict:
+def generate_ref(sg_table:str, vector_seq:str, ref_path:str) -> list:
     '''根据sgRNA序列表生成每个plate->well对应的reference'''
     # read sg seq table
     sg_df = pd.read_excel(sg_table)
 
-    # extracat raw vector seq
-    vector_seq:str
-    for v in SeqIO.parse(vector_seq,'fasta'):vector_seq = str(v.seq)
-    vector_li = vector_seq.split("N" * 20)
+    
+    sg_pos_li , vector_li = cut_seq_obtain_pos(vector_seq)
     
     # generate reference by sg df and raw vector seq
     idx = 1
@@ -55,13 +67,13 @@ def generate_ref(sg_table:str, vector_seq:str, ref_path:str) -> defaultdict:
             tmp_li[4] = vector_li[4]
             # storage finished,join and output as reference file
             well_ref = ''.join(tmp_li)
-            out_ref = open(f"{ref_path}/{plate}_{well}.fa",'w')
-            out_ref.write(f">{plate}_{well}\n{well_ref}\n")
+            # out_ref = open(f"{ref_path}/{plate}_{well}.fa",'w')
+            # out_ref.write(f">{plate}_{well}\n{well_ref}\n")
             # construct index
-            subprocess.run(f"bwa index {ref_path}/{plate}_{well}.fa", shell=True)
+            # subprocess.run(f"bwa index {ref_path}/{plate}_{well}.fa", shell=True)
             tmp_li = [''] * 5
         idx += 1  
-    
+    return sg_pos_li
     
 
     
@@ -114,32 +126,38 @@ def fq_from_abi(file_path:str) -> defaultdict:
 
 
 
-def parse_alignment_result(aln_res_str:str):
+def parse_alignment_result(aln_res_str:str, sg_pos_li:list):
     a = AlignedSegment()
     a.flag = 4
     a.cigarstring = "47M150S"
     print(a.get_cigar_stats())
+    # unmap or mismatch, warnning
+    
+    # mapped, detective 4 sgRNA correct or not
+    
+    
     
     
 
-def process_align(ref_file:str, fq_str:str) -> None:
-    '''将下机数据比对到参考并处理结果'''
+def process_align(ref_file:str, fq_str:str, sg_pos_li:list) -> None:
+    '''将下机数据比对到参考并处理比对结果'''
     # alignment by bwa and fetch alignment result
     res = subprocess.Popen(f"echo -e \"{fq_str}\" | bwa mem -t 24 {ref_file} /dev/stdin",shell=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     aln_res_str = str(res.stdout.read(),"utf-8").rstrip().split("\n")[-1]
     # process alignment result
-    parse_alignment_result(aln_res_str)
+    parse_alignment_result(aln_res_str, sg_pos_li)
     
 
     
 
 def main() -> None:
     input_file = "/home/wayne/Project/SC/Sanger/B103-(T3389)pUp-pDown-flank-R.ab1"
-    # generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
+    sg_pos_li = generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
     well = recognized_well_by_file_name()
+    plate = 0
     ref_file = f"{plate}_{well}.fa"
     fq_str = fq_from_abi(input_file)
-    process_align("raw_vector.fa", fq_str)
+    process_align("raw_vector.fa", fq_str, sg_pos_li)
     
 
 if __name__ == "__main__":
