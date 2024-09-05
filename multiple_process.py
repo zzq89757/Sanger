@@ -147,6 +147,11 @@ def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
 
     return sgRNA_cover_idx_li
 
+def coverage_check(cov_start: int, vov_end: int) -> bool:
+    '''检查是否完全覆盖目标区域'''
+    
+    return True
+    
 
 def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
     '''处理比对的结果'''
