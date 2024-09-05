@@ -130,7 +130,8 @@ def fq_from_abi(file_path:str) -> defaultdict:
         if not trimmed_qual_qc(trimmed_qual):
             print(f"{file_path} qc unpass !!!")
             return ''
-        fq_str = f"@{seq_id}\n{trimmed_seq}\n+\n{trimmed_qual}"
+        trimmed_qual_str = "".join(trimmed_qual)
+        fq_str = f"@{seq_id}\n{trimmed_seq}\n+\n{trimmed_qual_str}"
     return fq_str
 
 
