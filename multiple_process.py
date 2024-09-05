@@ -134,10 +134,18 @@ def extract_data(well_fq_file_dict:defaultdict, output_fq_path:str) -> None:
             output_handle.write(fq_str)
     
     
-def detective_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
-    '''检测比对的结果'''
+def process_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
+    '''处理比对的结果'''
+    well = int(output_bam.split("-")[0])
     for aln in AlignmentFile(output_bam,'r',threads=16):
-        aln.start
+        # if with mismath or softclip warnning
+        if sum(aln.get_cigar_stats()[0][1:]):
+            print(f"{output_bam} has mismatch or softclip !!!")
+            well_qc_dict[well]['invalid_seq_num'] += 1
+            return 0
+        # sgRNA detective
+        if aln.reference_start 
+        
     
     
 def process_alignment(ref_file:str, input_fq:str, output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict) -> None:
@@ -148,11 +156,11 @@ def process_alignment(ref_file:str, input_fq:str, output_bam:str, sg_pos_li:list
     aln_res_str = str(res.stdout.read(),"utf-8").rstrip().split("\n")[-1]
     sg_pos_li = generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
     # process alignment result
-    detective_alignment_result(output_bam, sg_pos_li, well_qc_dict)
+    process_alignment_result(output_bam, sg_pos_li, well_qc_dict)
 
 
 def qc_dict_to_table(well_qc_dict:defaultdict, output_table:str) :
-    '''将包含qc信息的 dict转为表格并存储为文件'''
+    '''将包含qc信息的dict转为表格并存储为文件'''
 
 
 def main():
