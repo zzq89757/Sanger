@@ -163,7 +163,7 @@ def sgRNA_detective(start:int, end:int, sg_pos_li:list) -> list[int]:
 def process_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
     '''处理比对的结果'''
     well = int(output_bam.split("-")[0])
-    well_qc_dict['sgRNA'] = []
+    well_qc_dict[well]['sgRNA'] = []
     for aln in AlignmentFile(output_bam,'r',threads=16):
         # if with mismath or softclip warnning
         if sum(aln.get_cigar_stats()[0][1:]):
@@ -172,7 +172,9 @@ def process_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaul
             return 0
         # sgRNA detective
         cover_idx_li:list[int] = sgRNA_detective(aln.reference_start, aln.reference_end, sg_pos_li)
-        well_qc_dict['sgRNA'] += cover_idx_li
+        for i in cover_idx_li:
+            well_qc_dict[well]['sgRNA'].append(i)
+    return well_qc_dict
     
     
     
