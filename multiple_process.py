@@ -147,9 +147,14 @@ def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
 
     return sgRNA_cover_idx_li
 
-def coverage_check(cov_start: int, vov_end: int) -> bool:
+def coverage_check(cov_start: int, cov_end: int, aln_region_li:list) -> bool:
     '''检查是否完全覆盖目标区域'''
-    
+    cov_dict = defaultdict(0)
+    for reg in aln_region_li:
+        for i in range(reg[0] + 1, reg[1] + 1):
+            cov_dict[i] = 1
+    for i in range(cov_start + 1, cov_end + 1):
+        if not cov_dict[i]:return False
     return True
     
 
@@ -157,6 +162,8 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
     '''处理比对的结果'''
     well = int(output_bam.split("-")[0])
     well_qc_dict[well]['sgRNA'] = [0] * 4
+    well_qc_dict[well]['coverage'] = 0
+    aln_region_li = []
     for aln in AlignmentFile(output_bam, 'r', threads=16):
         # if with mismath or softclip warnning
         if sum(aln.get_cigar_stats()[0][1:]):
@@ -167,7 +174,9 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
         cover_idx_li: list[int] = sgRNA_detective(
             aln.reference_start, aln.reference_end, sg_pos_li)
         for i in cover_idx_li:
-            well_qc_dict[well]['sgRNA'][cover_idx_li] = 1
+            well_qc_dict[well]['sgRNA'][i] = 1
+        aln_region_li.append([aln.reference_start, aln.reference_end])
+    if coverage_check(1, 1000, aln_region_li):well_qc_dict[well]['coverage'] = 1
 
 
 def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
@@ -183,11 +192,11 @@ def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: 
 def qc_dict_to_table(well_qc_dict: defaultdict, output_table: str) -> None:
     '''将包含qc信息的dict转为表格并存储为文件'''
     out_table_handle = open(output_table, 'w')
-    out_table_handle.write("Well\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall\n")
+    out_table_handle.write("Well\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall\tcoverage\n")
     for well in well_qc_dict.keys():
         all_detective = not 0 in well_qc_dict[well]['sgRNA']
         well_qc_str = str(well) + "\t" + "\t".join(
-            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\n"
+            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\n"
         out_table_handle.write(well_qc_str)
 
 
