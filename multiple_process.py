@@ -192,12 +192,13 @@ def main() -> None:
         "/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx", "/home/wayne/Project/SC/Sanger/raw_vector.fa")
     generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx",
                  vector_li, "./newref/")
-    # process alignment
+    # sanger file process
     file_dict = classify_file_by_well("/home/wayne/Project/SC/Sanger/")
     output_fq_path = "./fq/"
     extract_data(file_dict, output_fq_path)
     well_li = [str(x).split("_")[0] for x in Path(output_fq_path).glob("*fq")]
     well_qc_dict = defaultdict(lambda: defaultdict(list))
+    # alignment and output
     for well in well_li:
         ref_file = ""
         input_fq = ""
