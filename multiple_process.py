@@ -174,7 +174,6 @@ def process_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaul
         cover_idx_li:list[int] = sgRNA_detective(aln.reference_start, aln.reference_end, sg_pos_li)
         for i in cover_idx_li:
             well_qc_dict[well]['sgRNA'].append(i)
-    return well_qc_dict
     
     
     
@@ -206,7 +205,7 @@ def main():
     output_fq_path="./fq/"
     extract_data(file_dict,output_fq_path)
     well_li = [str(x).split("_")[0] for x in Path(output_fq_path).glob("*fq")]
-    well_qc_dict = defaultdict(list)
+    well_qc_dict = defaultdict(lambda :defaultdict(list))
     for well in well_li:
         ref_file = ""
         input_fq = ""
