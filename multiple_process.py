@@ -134,20 +134,25 @@ def extract_data(well_fq_file_dict:defaultdict, output_fq_path:str) -> None:
             output_handle.write(fq_str)
     
     
-def detective_alignment_result():
-    '''检测是否存在异常的结果'''
-    ...
+def detective_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
+    '''检测比对的结果'''
+    for aln in AlignmentFile(output_bam,'r',threads=16):
+        aln.start
     
     
-def process_alignment(ref_file:str, input_fq:str, output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
+def process_alignment(ref_file:str, input_fq:str, output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict) -> None:
     '''执行bwa命令后处理bam文件'''
     # alignment by bwa and fetch alignment result
-    res = subprocess.Popen(f"bwa mem -t 24 {ref_file} {input_fq} > ",shell=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    res = subprocess.Popen(f"bwa mem -t 24 {ref_file} {input_fq} > {output_bam}",shell=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     aln_res_str = str(res.stdout.read(),"utf-8").rstrip().split("\n")[-1]
     sg_pos_li = generate_ref("/home/wayne/Project/SC/Sanger/Ho_tf1.xlsx","/home/wayne/Project/SC/Sanger/raw_vector.fa","./newref/")
     # process alignment result
-    detective_alignment_result(aln_res_str, sg_pos_li)
+    detective_alignment_result(output_bam, sg_pos_li, well_qc_dict)
 
+
+def qc_dict_to_table(well_qc_dict:defaultdict, output_table:str) :
+    '''将包含qc信息的 dict转为表格并存储为文件'''
 
 
 def main():
@@ -165,3 +170,8 @@ def main():
         input_fq = ""
         output_bam = ""
         process_alignment()
+    qc_dict_to_table(well_qc_dict,"./res.tsv")
+    
+
+if __name__ == "__main__":
+    main()
