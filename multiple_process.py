@@ -98,10 +98,17 @@ def classify_file_by_well(file_path:Path) -> defaultdict:
 
 def trim_static(seq_record, start:int=50, end:int=800):
     '''裁剪下机数据，固定保留50-800部分'''
-    # return seq_record.seq[50:800], seq_record.letter_annotations["phred_quality"][50:800]
-    return seq_record.seq[50:800], "F" * 750
-    
+    # return seq_record.seq[50:800], "F" * 750
+    return seq_record.seq[50:800], seq_record.letter_annotations["phred_quality"][50:800]
 
+def trimmed_qual_qc(qc_array) -> bool:
+    # calc mean qual
+    
+    # calc q20 and q30
+    q_20 = len([x for x in qc_array if x >= 20])/len(qc_array)
+    q_30 = len([x for x in qc_array if x >= 30])/len(qc_array)
+    if q_20 < 0.9 or q_30 < 0.8:return False
+    return True
 
 def fq_from_abi(file_path:str) -> defaultdict:
     '''读取ab1文件并将序列信息存入fq格式字符串'''
@@ -114,9 +121,15 @@ def fq_from_abi(file_path:str) -> defaultdict:
         data_a = list(abif_raw["DATA10"])
         data_t = list(abif_raw["DATA11"])
         data_c = list(abif_raw["DATA12"])
+        # signal qc 
+        
         # trimmed_record = trim_seq_by_qual(seq)
         # trim seq and qual,storage in dict
         trimmed_seq, trimmed_qual = trim_static(seq)
+        # trimmed qual control
+        if not trimmed_qual_qc(trimmed_qual):
+            print(f"{file_path} qc unpass !!!")
+            return ''
         fq_str = f"@{seq_id}\n{trimmed_seq}\n+\n{trimmed_qual}"
     return fq_str
 
@@ -132,11 +145,24 @@ def extract_data(well_fq_file_dict:defaultdict, output_fq_path:str) -> None:
         for file in file_li:
             fq_str = fq_from_abi(file)
             output_handle.write(fq_str)
+
+
+def sgRNA_detective(start:int, end:int, sg_pos_li:list) -> list[int]:
+    '''比对结果覆盖到了第几条sgRNA'''
+    sgRNA_cover_idx_li = []
+    for idx, pos in enumerate(sg_pos_li):
+        if end > pos + 20 and pos > start:
+            sgRNA_cover_idx_li.append(idx)
     
+    return sgRNA_cover_idx_li
+    
+    
+
     
 def process_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaultdict):
     '''处理比对的结果'''
     well = int(output_bam.split("-")[0])
+    well_qc_dict['sgRNA'] = []
     for aln in AlignmentFile(output_bam,'r',threads=16):
         # if with mismath or softclip warnning
         if sum(aln.get_cigar_stats()[0][1:]):
@@ -144,7 +170,12 @@ def process_alignment_result(output_bam:str, sg_pos_li:list, well_qc_dict:defaul
             well_qc_dict[well]['invalid_seq_num'] += 1
             return 0
         # sgRNA detective
-        if aln.reference_start 
+        cover_idx_li:list[int] = sgRNA_detective(aln.reference_start, aln.reference_end, sg_pos_li)
+        well_qc_dict['sgRNA'] += cover_idx_li
+    
+    
+    
+        
         
     
     
