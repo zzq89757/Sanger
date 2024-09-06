@@ -1,4 +1,5 @@
 from collections import defaultdict, deque
+from math import ceil
 from pathlib import Path
 import subprocess
 from Bio import SeqIO
@@ -88,6 +89,20 @@ def classify_file_by_well(file_path: Path) -> defaultdict:
     return well_fq_file_dict
 
 
+def set_end_pos(start_pos: int, next_base_pos: int, end_pos: int, trace_len: int) -> int:
+            if next_base_pos:
+                end_pos = start_pos + ceil((next_base_pos - start_pos) / 2)
+            else:
+                end_pos = trace_len
+            return end_pos
+        
+
+
+def peak_qc(a_trace, g_trace, t_trace, c_trace) -> bool:
+    '''对每个轨道进行信号重叠以及峰型分析'''
+    
+    
+
 def trim_static(seq_record, start: int = 50, end: int = 800) -> list:
     '''裁剪下机数据，固定保留50-800部分'''
     # return seq_record.seq[50:800], "F" * 750
@@ -112,10 +127,10 @@ def fq_from_abi(file_path: str) -> defaultdict:
         seq_id = seq.name
         # base signal
         abif_raw = seq.annotations["abif_raw"]
-        data_g = list(abif_raw["DATA9"])
-        data_a = list(abif_raw["DATA10"])
-        data_t = list(abif_raw["DATA11"])
-        data_c = list(abif_raw["DATA12"])
+        g_trace = list(abif_raw["DATA9"])
+        a_trace = list(abif_raw["DATA10"])
+        t_trace = list(abif_raw["DATA11"])
+        c_trace = list(abif_raw["DATA12"])
         # signal qc
 
         # trim seq and qual,storage in dict
