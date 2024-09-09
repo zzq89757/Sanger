@@ -100,6 +100,7 @@ def set_end_pos(start_pos: int, next_base_pos: int, end_pos: int, trace_len: int
 
 def peak_qc(a_trace, g_trace, t_trace, c_trace) -> bool:
     '''对每个轨道进行信号重叠以及峰型分析'''
+    ...
     
     
 
@@ -229,10 +230,10 @@ def main() -> None:
     well_qc_dict = defaultdict(lambda: defaultdict(list))
     # alignment and output
     for well in well_li:
-        ref_file = ""
-        input_fq = ""
-        output_bam = ""
-        process_alignment()
+        ref_file = f"./newref/{well}.fa"
+        input_fq = f"{output_fq_path}/{well}_trimed.fq"
+        output_bam = f"{output_fq_path}/{well}_aln.bam"
+        process_alignment(ref_file, input_fq, output_bam, well_qc_dict)
     qc_dict_to_table(well_qc_dict, "./res.tsv")
 
 
