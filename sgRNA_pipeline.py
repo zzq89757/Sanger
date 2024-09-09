@@ -233,7 +233,7 @@ def main() -> None:
         ref_file = f"./newref/{well}.fa"
         input_fq = f"{output_fq_path}/{well}_trimed.fq"
         output_bam = f"{output_fq_path}/{well}_aln.bam"
-        process_alignment(ref_file, input_fq, output_bam, well_qc_dict)
+        process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict)
     qc_dict_to_table(well_qc_dict, "./res.tsv")
 
 
