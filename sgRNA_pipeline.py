@@ -133,6 +133,8 @@ def trimmed_qual_qc(qc_array) -> bool:
     # calc mean qual
 
     # calc q20 and q30
+
+        
     q_20 = len([x for x in qc_array if x >= 20])/len(qc_array)
     q_30 = len([x for x in qc_array if x >= 30])/len(qc_array)
     if q_20 < 0.9 or q_30 < 0.8:
@@ -155,9 +157,13 @@ def fq_from_abi(trim_start:int, trim_end:int, well_qc_dict:defaultdict, file_pat
 
         # trim seq and qual,storage in dict
         trimmed_seq, trimmed_qual = trim_static(seq, trim_start, trim_end)
+        well = recognized_well_by_file_name(Path(file_path).name)
+        if not trimmed_qual:
+            well_qc_dict[well]['qc_failed'] = [1]
+            print(f"{file_path} no signal !!!")
+            return ''
         # trimmed qual control
         if not trimmed_qual_qc(trimmed_qual):
-            well = recognized_well_by_file_name(Path(file_path).name)
             well_qc_dict[well]['qc_failed'] = [1]
             print(f"{file_path} qc unpass !!!")
             return ''
@@ -177,13 +183,16 @@ def extract_data(trim_start:int, trim_end:int, well_qc_dict:defaultdict, well_fq
             output_handle.write(fq_str)
 
 
-def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict) -> None:
+def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detective_end:int) -> None:
     '''检查错配数目,等于1报点,大于1报错'''
     all_snp_count = sum(aln.get_cigar_stats()[0][1:])
+    # if aln.reference_end < detective_end:
+    #     print(aln.reference_end)
     # if with mismath or softclip, and mismatch > 1 
+    # well_qc_dict[well]['mismatch'] = '0'
     if all_snp_count > 1:   
         print(f"{aln.query_name} has mismatch or softclip !!!")
-        well_qc_dict[well]['mismatch'] = '1+'
+        well_qc_dict[well]['mismatch'] += [1000,1000]
         # return 0
     elif all_snp_count == 1:
         # get snp position
@@ -191,9 +200,10 @@ def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict) -> No
         md_snp_idx = md_tag.find('A') + 1 or md_tag.find('G') + 1 or md_tag.find('C') + 1 or md_tag.find('T') + 1
         forward_len =  int(md_tag[:md_snp_idx - 1])
         pos = aln.reference_start + forward_len
-        well_qc_dict[well]['mismatch'] = str(pos)
-    else:
-        well_qc_dict[well]['mismatch'] = '0'
+        if pos < detective_end:
+            well_qc_dict[well]['mismatch'].append(pos)
+    # else:
+    #     well_qc_dict[well]['mismatch'] = '0'
 
 def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
     '''比对结果覆盖到了第几条sgRNA'''
@@ -226,7 +236,7 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
         # skip supplementary and secondary
         if aln.is_supplementary or aln.is_secondary:continue
         # mismatch check
-        mismatch_check(well, aln, well_qc_dict)      
+        mismatch_check(well, aln, well_qc_dict, sg_pos_li[-1] + 100)      
         # sgRNA detective
         cover_idx_li: list[int] = sgRNA_detective(
             aln.reference_start, aln.reference_end, sg_pos_li)
@@ -234,7 +244,7 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
             well_qc_dict[well]['sgRNA'][i] = 1
         aln_region_li.append([aln.reference_start, aln.reference_end])
     # coverage check after all fastq mapped to ref
-    if coverage_check(5914, 7933, aln_region_li):well_qc_dict[well]['coverage'] = 1
+    if coverage_check(5914, sg_pos_li[-1] + 150, aln_region_li):well_qc_dict[well]['coverage'] = 1
 
 
 def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
@@ -250,10 +260,15 @@ def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, outpu
     '''将包含qc信息的dict转为表格并存储为文件'''
     out_table_handle = open(output_table, 'w')
     out_table_handle.write("Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\n")
-    for well in sorted(well_qc_dict.keys()):
+    for well in sorted(well_qc_dict.keys(),key=lambda well:well2subplate(int(well))):
+        mis_out = '0' 
+        if len(well_qc_dict[well]['mismatch']) > 1:
+            mis_out = '1+'
+        elif len(well_qc_dict[well]['mismatch']) == 1:
+            mis_out = str(well_qc_dict[well]['mismatch'][0])
         all_detective = not 0 in well_qc_dict[well]['sgRNA']
         well_qc_str = well2subplate(int(well)) + "\t" + str(well) + "\t" + "\t".join(
-            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" + well_qc_dict[well]['mismatch'] + "\n"
+            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" +mis_out + "\n"
         out_table_handle.write(well_qc_str)
 
 
@@ -266,6 +281,7 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
         Path(dir).mkdir(exist_ok=1,parents=1)
     global subplate_num
     subplate_num = subplate_no
+    
     # construct reference of each well
     sg_pos_li, vector_li = cut_seq_obtain_pos(raw_vector_path)
     well_ref_dict = generate_ref(sgRNA_table_path,
@@ -283,8 +299,8 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
         input_fq = str(fq)
         output_bam = f"{output_bam_path}/{well2subplate(int(well))}_{well}.bam"
         process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict)
-    qc_dict_to_table(well_qc_dict, well_ref_dict, f"{output_path}/res.tsv")
+    qc_dict_to_table(well_qc_dict, well_ref_dict, f"{output_path}/{subplate_no}_res.tsv")
 
 
 if __name__ == "__main__":
-    process_pipeline(subplate_no="HA-1", trim_start=100, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/rawdata/HA-1-1/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/raw_vector.fa", output_path="./res")
+    process_pipeline(subplate_no="HA-1", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-1_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/raw_vector.fa", output_path="./HA-1_res")
