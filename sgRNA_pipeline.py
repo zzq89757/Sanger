@@ -1,11 +1,12 @@
-from collections import defaultdict, deque
-from math import ceil
+from collections import defaultdict
 from os import system
 from pathlib import Path
 from Bio import SeqIO
-from pysam import AlignmentFile
+from pysam import AlignmentFile, AlignedSegment
 import pandas as pd
 
+
+subplate_num = ''
 
 def cut_seq_obtain_pos(vector_seq: str) -> list:
     '''根据原始载体构建sgRNA位置列表以及载体不含sgRNA的切片列表'''
@@ -43,12 +44,13 @@ def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
             # storage finished,join and output as reference file
             well_ref = ''.join(tmp_li)
             well_ref_dict[well] = well_ref
-            if not Path(f"{ref_path}/{well}.fa").exists():
+            sub_plate = well2subplate(well)
+            if not Path(f"{ref_path}/{sub_plate}_{well}.fa").exists():
                 # write into fastq file
-                out_ref = open(f"{ref_path}/{well}.fa", 'w')
-                out_ref.write(f">{well}\n{well_ref}\n")
+                out_ref = open(f"{ref_path}/{sub_plate}_{well}.fa", 'w')
+                out_ref.write(f">{sub_plate}_{well}\n{well_ref}\n")
                 # construct index
-                system(f"bwa index {ref_path}/{well}.fa")
+                system(f"bwa index {ref_path}/{sub_plate}_{well}.fa")
             tmp_li = [''] * 5
         idx += 1
     return well_ref_dict
@@ -56,9 +58,6 @@ def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
 
 # 提取同一个well中的多个ab1文件中的序列信息 保存为fq后 bwa比对 处理bam文件
 def well2subplate(well:int) -> str:
-    # row_num = well // 24
-    # col_num = well % 24 // 2 
-    # a = chr(row_num + 65)
     cycle = (well // 48) 
     zimu = chr(cycle + 65)
     subplate = 0
@@ -77,7 +76,8 @@ def well2subplate(well:int) -> str:
         else:
             subplate = 4
             b = (well - 48 * cycle - 24) // 2
-    return f"HA-1-{subplate}-{zimu}{str(b).zfill(2)}"
+    global subplate_num
+    return f"{subplate_num}-{subplate}-{zimu}{str(b).zfill(2)}"
 
 
 def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
@@ -107,29 +107,15 @@ def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
     return well
 
 
-
-
-
 def classify_file_by_well(file_path: str) -> defaultdict:
     '''输入下机数据路径,将其分配至对应的well'''
     well_fq_file_dict = defaultdict(list)
     file_li = Path(file_path).glob("*.ab*")
     for file in file_li:
         file_name = file.name
-        # file_name = "".join(file_name)
-        # print(file_name)
         well = recognized_well_by_file_name(file_name)
         well_fq_file_dict[well].append(file)
-    return well_fq_file_dict
-
-
-def set_end_pos(start_pos: int, next_base_pos: int, end_pos: int, trace_len: int) -> int:
-            if next_base_pos:
-                end_pos = start_pos + ceil((next_base_pos - start_pos) / 2)
-            else:
-                end_pos = trace_len
-            return end_pos
-        
+    return well_fq_file_dict      
 
 
 def peak_qc(a_trace, g_trace, t_trace, c_trace) -> bool:
@@ -137,11 +123,10 @@ def peak_qc(a_trace, g_trace, t_trace, c_trace) -> bool:
     ...
     
     
-
 def trim_static(seq_record, start: int = 50, end: int = 800) -> list:
-    '''裁剪下机数据，固定保留50-800部分'''
+    '''裁剪下机数据,固定保留50-800部分'''
     # return seq_record.seq[50:800], "F" * 750
-    return [seq_record.seq[50:800], seq_record.letter_annotations["phred_quality"][50:800]]
+    return [seq_record.seq[start:end], seq_record.letter_annotations["phred_quality"][start:end]]
 
 
 def trimmed_qual_qc(qc_array) -> bool:
@@ -155,7 +140,7 @@ def trimmed_qual_qc(qc_array) -> bool:
     return True
 
 
-def fq_from_abi(well_qc_dict:defaultdict, file_path: str) -> defaultdict:
+def fq_from_abi(trim_start:int, trim_end:int, well_qc_dict:defaultdict, file_path: str) -> defaultdict:
     '''读取ab1文件并将序列信息存入fq格式字符串'''
     fq_str = ""
     for seq in SeqIO.parse(file_path, "abi"):
@@ -169,7 +154,7 @@ def fq_from_abi(well_qc_dict:defaultdict, file_path: str) -> defaultdict:
         # signal qc
 
         # trim seq and qual,storage in dict
-        trimmed_seq, trimmed_qual = trim_static(seq)
+        trimmed_seq, trimmed_qual = trim_static(seq, trim_start, trim_end)
         # trimmed qual control
         if not trimmed_qual_qc(trimmed_qual):
             well = recognized_well_by_file_name(Path(file_path).name)
@@ -181,16 +166,34 @@ def fq_from_abi(well_qc_dict:defaultdict, file_path: str) -> defaultdict:
     return fq_str
 
 
-def extract_data(well_qc_dict:defaultdict, well_fq_file_dict: defaultdict, output_fq_path: str) -> None:
+def extract_data(trim_start:int, trim_end:int, well_qc_dict:defaultdict, well_fq_file_dict: defaultdict, output_fq_path: str) -> None:
     '''提取每个well中的序列信息并将属于同一个well的序列存为fq'''
     for well, file_li in well_fq_file_dict.items():
         subplate_info  = Path(file_li[0]).name.split("-")[:4]
         sub_name = "-".join(subplate_info)
         output_handle = open(f"{output_fq_path}/{sub_name}_{well}.fq", 'w')
         for file in file_li:
-            fq_str = fq_from_abi(well_qc_dict, file)
+            fq_str = fq_from_abi(trim_start, trim_end, well_qc_dict, file)
             output_handle.write(fq_str)
 
+
+def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict) -> None:
+    '''检查错配数目,等于1报点,大于1报错'''
+    all_snp_count = sum(aln.get_cigar_stats()[0][1:])
+    # if with mismath or softclip, and mismatch > 1 
+    if all_snp_count > 1:   
+        print(f"{aln.query_name} has mismatch or softclip !!!")
+        well_qc_dict[well]['mismatch'] = '1+'
+        # return 0
+    elif all_snp_count == 1:
+        # get snp position
+        md_tag = aln.get_tag('MD')
+        md_snp_idx = md_tag.find('A') + 1 or md_tag.find('G') + 1 or md_tag.find('C') + 1 or md_tag.find('T') + 1
+        forward_len =  int(md_tag[:md_snp_idx - 1])
+        pos = aln.reference_start + forward_len
+        well_qc_dict[well]['mismatch'] = str(pos)
+    else:
+        well_qc_dict[well]['mismatch'] = '0'
 
 def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
     '''比对结果覆盖到了第几条sgRNA'''
@@ -200,6 +203,7 @@ def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
             sgRNA_cover_idx_li.append(idx)
 
     return sgRNA_cover_idx_li
+
 
 def coverage_check(cov_start: int, cov_end: int, aln_region_li:list) -> bool:
     '''检查是否完全覆盖目标区域'''
@@ -214,30 +218,28 @@ def coverage_check(cov_start: int, cov_end: int, aln_region_li:list) -> bool:
 
 def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
     '''处理比对的结果'''
-    well = int(Path(output_bam).name.split(".")[0])
+    well = int(Path(output_bam).name.split(".")[0].split("_")[-1])
     well_qc_dict[well]['sgRNA'] = [0] * 4
     well_qc_dict[well]['coverage'] = 0
     aln_region_li = []
     for aln in AlignmentFile(output_bam, 'r', threads=16):
-        # if with mismath or softclip warnning
-        if sum(aln.get_cigar_stats()[1][1:]):
-            # print(aln.get_cigar_stats())
-            print(f"{aln.query_name} has mismatch or softclip !!!")
-            well_qc_dict[well]['mismath'].append(aln.query_name)
-            # return 0
+        # skip supplementary and secondary
+        if aln.is_supplementary or aln.is_secondary:continue
+        # mismatch check
+        mismatch_check(well, aln, well_qc_dict)      
         # sgRNA detective
         cover_idx_li: list[int] = sgRNA_detective(
             aln.reference_start, aln.reference_end, sg_pos_li)
         for i in cover_idx_li:
             well_qc_dict[well]['sgRNA'][i] = 1
         aln_region_li.append([aln.reference_start, aln.reference_end])
+    # coverage check after all fastq mapped to ref
     if coverage_check(5914, 7933, aln_region_li):well_qc_dict[well]['coverage'] = 1
 
 
 def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
     '''执行bwa命令后处理bam文件'''
     # alignment by bwa and fetch alignment result
-    # print(f"bwa mem -t 24 {ref_file} {input_fq} > {output_bam}")
     if not Path(output_bam).exists():system(f"bwa mem -t 24 {ref_file} {input_fq} > {output_bam}")
 
     # process alignment result
@@ -247,39 +249,42 @@ def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: 
 def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, output_table: str) -> None:
     '''将包含qc信息的dict转为表格并存储为文件'''
     out_table_handle = open(output_table, 'w')
-    out_table_handle.write("Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\n")
+    out_table_handle.write("Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\n")
     for well in sorted(well_qc_dict.keys()):
         all_detective = not 0 in well_qc_dict[well]['sgRNA']
-        if not well_qc_dict[well]['coverage']:
-            Path("./pick_ref/").mkdir(exist_ok=1)
-            system(f"cp newref/{well}.fa pick_ref/{well2subplate(well)}_{well}.fa")
         well_qc_str = well2subplate(int(well)) + "\t" + str(well) + "\t" + "\t".join(
-            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\n"
+            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" + well_qc_dict[well]['mismatch'] + "\n"
         out_table_handle.write(well_qc_str)
 
 
-def main() -> None:
+def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_path:str, sgRNA_table_path:str, input_path:str, output_path:str) -> None:
+    # mkdir and get subplate
+    output_fq_path = f"{output_path}/fq/"
+    output_ref_path = f"{output_path}/ref/"
+    output_bam_path = f"{output_path}/bam/"
+    for dir in [output_fq_path, output_ref_path, output_bam_path]:
+        Path(dir).mkdir(exist_ok=1,parents=1)
+    global subplate_num
+    subplate_num = subplate_no
     # construct reference of each well
-    sg_pos_li, vector_li = cut_seq_obtain_pos("/home/wayne/Project/SC/Sanger/raw_vector.fa")
-    well_ref_dict = generate_ref("/home/wayne/Project/SC/Sanger/HA-1.xlsx",
-                 vector_li, "./newref/")
+    sg_pos_li, vector_li = cut_seq_obtain_pos(raw_vector_path)
+    well_ref_dict = generate_ref(sgRNA_table_path,
+                 vector_li, output_ref_path)
+    
     # sanger file process
-    file_dict = classify_file_by_well("/home/wayne/Project/SC/Sanger/rawdata/HA-1-1/")
-    output_fq_path = "./fq/"
-    output_bam_path = "./bam/"
+    file_dict = classify_file_by_well(input_path)
     well_qc_dict = defaultdict(lambda: defaultdict(list))
-    extract_data(well_qc_dict, file_dict, output_fq_path)
-    # well_li = [x.name.split(".")[0] for x in ]
+    extract_data(trim_start, trim_end, well_qc_dict, file_dict, output_fq_path)
+    
     # alignment and output
     for fq in Path(output_fq_path).glob("*fq"):
         sub_info, well = fq.name.split(".")[0].split("_")
-        # print(well)
-        ref_file = f"./newref/{well}.fa"
+        ref_file = f"{output_ref_path}/{well2subplate(int(well))}_{well}.fa"
         input_fq = str(fq)
-        output_bam = f"{output_bam_path}/{well}.bam"
+        output_bam = f"{output_bam_path}/{well2subplate(int(well))}_{well}.bam"
         process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict)
-    qc_dict_to_table(well_qc_dict, well_ref_dict, "./res.tsv")
+    qc_dict_to_table(well_qc_dict, well_ref_dict, f"{output_path}/res.tsv")
 
 
 if __name__ == "__main__":
-    main()
+    process_pipeline(subplate_no="HA-1", trim_start=100, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/rawdata/HA-1-1/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/raw_vector.fa", output_path="./res")
