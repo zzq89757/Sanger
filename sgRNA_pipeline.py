@@ -210,6 +210,12 @@ def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detec
     # else:
     #     well_qc_dict[well]['mismatch'] = '0'
 
+
+def snp_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detective_end:int) -> None:
+    ...
+
+
+
 def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
     '''比对结果覆盖到了第几条sgRNA'''
     sgRNA_cover_idx_li = []
