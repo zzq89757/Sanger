@@ -62,6 +62,8 @@ def well2subplate(well:int) -> str:
     zimu = chr(cycle + 65)
     subplate = 0
     b = 0
+    print(f"cycle is {cycle}")
+    print(f"well - 48 * cycle is {well - 48 * cycle}")
     if well - 48 * cycle <= 24:
         if well % 2 == 1:
             subplate = 1
@@ -69,6 +71,10 @@ def well2subplate(well:int) -> str:
         else:
             subplate = 2
             b = ((well - 48 * cycle)//2)
+            if well - 48 * cycle == 0:
+                subplate = 4
+                b = 12
+                zimu = chr(cycle + 64)
     else:
         if well % 2 == 1:
             subplate = 3
@@ -78,6 +84,7 @@ def well2subplate(well:int) -> str:
             b = (well - 48 * cycle - 24) // 2
     global subplate_num
     return f"{subplate_num}-{subplate}-{zimu}{str(b).zfill(2)}"
+
 
 
 def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
@@ -261,10 +268,11 @@ def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, outpu
     out_table_handle = open(output_table, 'w')
     out_table_handle.write("Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\n")
     for well in sorted(well_qc_dict.keys(),key=lambda well:well2subplate(int(well))):
-        mis_out = '0' 
-        if len(well_qc_dict[well]['mismatch']) > 1:
+        mis_out = '0'
+        if not well_qc_dict[well]['coverage']:mis_out = '-'
+        if len(well_qc_dict[well]['mismatch']) > 1 and well_qc_dict[well]['coverage']:
             mis_out = '1+'
-        elif len(well_qc_dict[well]['mismatch']) == 1:
+        elif len(well_qc_dict[well]['mismatch']) == 1 and well_qc_dict[well]['coverage']:
             mis_out = str(well_qc_dict[well]['mismatch'][0])
         all_detective = not 0 in well_qc_dict[well]['sgRNA']
         well_qc_str = well2subplate(int(well)) + "\t" + str(well) + "\t" + "\t".join(
