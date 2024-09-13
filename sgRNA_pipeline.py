@@ -6,7 +6,7 @@ from pysam import AlignmentFile, AlignedSegment
 import pandas as pd
 
 
-subplate_num = ''
+prefix = ''
 
 def cut_seq_obtain_pos(vector_seq: str) -> list:
     '''根据原始载体构建sgRNA位置列表以及载体不含sgRNA的切片列表'''
@@ -59,31 +59,29 @@ def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
 # 提取同一个well中的多个ab1文件中的序列信息 保存为fq后 bwa比对 处理bam文件
 def well2subplate(well:int) -> str:
     cycle = (well // 48) 
-    zimu = chr(cycle + 65)
+    subwell_row = chr(cycle + 65)
     subplate = 0
-    b = 0
-    print(f"cycle is {cycle}")
-    print(f"well - 48 * cycle is {well - 48 * cycle}")
+    subwell_col = 0
     if well - 48 * cycle <= 24:
         if well % 2 == 1:
             subplate = 1
-            b = ((well - 48 * cycle)//2) + 1
+            subwell_col = ((well - 48 * cycle)//2) + 1
         else:
             subplate = 2
-            b = ((well - 48 * cycle)//2)
+            subwell_col = ((well - 48 * cycle)//2)
             if well - 48 * cycle == 0:
                 subplate = 4
-                b = 12
-                zimu = chr(cycle + 64)
+                subwell_col = 12
+                subwell_row = chr(cycle + 64)
     else:
         if well % 2 == 1:
             subplate = 3
-            b = ((well - 48 * cycle - 24) // 2) + 1
+            subwell_col = ((well - 48 * cycle - 24) // 2) + 1
         else:
             subplate = 4
-            b = (well - 48 * cycle - 24) // 2
-    global subplate_num
-    return f"{subplate_num}-{subplate}-{zimu}{str(b).zfill(2)}"
+            subwell_col = (well - 48 * cycle - 24) // 2
+    global prefix
+    return f"{prefix}-{subplate}-{subwell_row}{str(subwell_col).zfill(2)}"
 
 
 
@@ -287,8 +285,8 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
     output_bam_path = f"{output_path}/bam/"
     for dir in [output_fq_path, output_ref_path, output_bam_path]:
         Path(dir).mkdir(exist_ok=1,parents=1)
-    global subplate_num
-    subplate_num = subplate_no
+    global prefix
+    prefix = subplate_no
     
     # construct reference of each well
     sg_pos_li, vector_li = cut_seq_obtain_pos(raw_vector_path)
