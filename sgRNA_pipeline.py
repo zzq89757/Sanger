@@ -30,7 +30,7 @@ def cut_seq_obtain_pos(vector_seq: str) -> list:
 def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
     '''根据sgRNA序列表生成每个plate->well对应的reference'''
     well_ref_dict = defaultdict(str)
-    # read sg seq table
+    # aln sg seq table
     sg_df = pd.read_excel(sg_table)
 
     # generate reference by sg df and raw vector seq
@@ -85,7 +85,7 @@ def well2subplate(well:int) -> str:
 
 
 
-def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
+def recognized_well_by_file_name(file_name: str = "HA-2-1-A01") -> int:
     '''根据文件名对应的子板及孔位获取拆分前的孔号'''
 
     sub_dict = defaultdict(list)
@@ -191,14 +191,10 @@ def extract_data(trim_start:int, trim_end:int, well_qc_dict:defaultdict, well_fq
 def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detective_end:int) -> None:
     '''检查错配数目,等于1报点,大于1报错'''
     all_snp_count = sum(aln.get_cigar_stats()[0][1:])
-    # if aln.reference_end < detective_end:
-    #     print(aln.reference_end)
-    # if with mismath or softclip, and mismatch > 1 
-    # well_qc_dict[well]['mismatch'] = '0'
     if all_snp_count > 1:   
         print(f"{aln.query_name} has mismatch or softclip !!!")
-        well_qc_dict[well]['mismatch'] += [1000,1000]
-        # return 0
+        well_qc_dict[well]['indel_soft'] += [1]
+        return 1
     elif all_snp_count == 1:
         # get snp position
         md_tag = aln.get_tag('MD')
@@ -211,16 +207,15 @@ def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detec
     #     well_qc_dict[well]['mismatch'] = '0'
 
 
-def snp_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detective_end:int) -> None:
-    ...
 
 
-
-def sgRNA_detective(start: int, end: int, sg_pos_li: list) -> list[int]:
+def sgRNA_detective(well: int, well_ref_dict:defaultdict, aln:AlignedSegment, sg_pos_li: list) -> list[int]:
     '''比对结果覆盖到了第几条sgRNA'''
     sgRNA_cover_idx_li = []
+    ref = well_ref_dict[well]
+    q_start = aln.reference_start
     for idx, pos in enumerate(sg_pos_li):
-        if end > pos + 20 and pos > start:
+        if aln.query_alignment_sequence[pos - q_start:pos - q_start + 20].upper() == ref[pos:pos + 20].upper():
             sgRNA_cover_idx_li.append(idx)
 
     return sgRNA_cover_idx_li
@@ -237,7 +232,7 @@ def coverage_check(cov_start: int, cov_end: int, aln_region_li:list) -> bool:
     return True
     
 
-def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
+def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict, well_ref_dict:defaultdict) -> None:
     '''处理比对的结果'''
     well = int(Path(output_bam).name.split(".")[0].split("_")[-1])
     well_qc_dict[well]['sgRNA'] = [0] * 4
@@ -247,10 +242,10 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
         # skip supplementary and secondary
         if aln.is_supplementary or aln.is_secondary:continue
         # mismatch check
-        mismatch_check(well, aln, well_qc_dict, sg_pos_li[-1] + 100)      
+        if mismatch_check(well, aln, well_qc_dict, sg_pos_li[-1] + 100):continue
         # sgRNA detective
-        cover_idx_li: list[int] = sgRNA_detective(
-            aln.reference_start, aln.reference_end, sg_pos_li)
+        cover_idx_li: list[int] = sgRNA_detective(well,well_ref_dict,
+            aln, sg_pos_li)
         for i in cover_idx_li:
             well_qc_dict[well]['sgRNA'][i] = 1
         aln_region_li.append([aln.reference_start, aln.reference_end])
@@ -258,19 +253,19 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
     if coverage_check(5914, sg_pos_li[-1] + 150, aln_region_li):well_qc_dict[well]['coverage'] = 1
 
 
-def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict) -> None:
+def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict, well_ref_dict:defaultdict) -> None:
     '''执行bwa命令后处理bam文件'''
     # alignment by bwa and fetch alignment result
     if not Path(output_bam).exists():system(f"bwa mem -t 24 {ref_file} {input_fq} > {output_bam}")
 
     # process alignment result
-    parse_alignment_result(output_bam, sg_pos_li, well_qc_dict)
+    parse_alignment_result(output_bam, sg_pos_li, well_qc_dict, well_ref_dict)
 
 
 def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, output_table: str) -> None:
     '''将包含qc信息的dict转为表格并存储为文件'''
     out_table_handle = open(output_table, 'w')
-    out_table_handle.write("Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\n")
+    out_table_handle.write("Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel_soft\n")
     for well in sorted(well_qc_dict.keys(),key=lambda well:well2subplate(int(well))):
         mis_out = '0'
         if not well_qc_dict[well]['coverage']:mis_out = '-'
@@ -280,7 +275,7 @@ def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, outpu
             mis_out = str(well_qc_dict[well]['mismatch'][0])
         all_detective = not 0 in well_qc_dict[well]['sgRNA']
         well_qc_str = well2subplate(int(well)) + "\t" + str(well) + "\t" + "\t".join(
-            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" +mis_out + "\n"
+            [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" +mis_out + "\t" + str(len(well_qc_dict[well]['indel_soft'])) + "\n"
         out_table_handle.write(well_qc_str)
 
 
@@ -310,9 +305,9 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
         ref_file = f"{output_ref_path}/{well2subplate(int(well))}_{well}.fa"
         input_fq = str(fq)
         output_bam = f"{output_bam_path}/{well2subplate(int(well))}_{well}.bam"
-        process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict)
+        process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict, well_ref_dict)
     qc_dict_to_table(well_qc_dict, well_ref_dict, f"{output_path}/{subplate_no}_res.tsv")
 
 
 if __name__ == "__main__":
-    process_pipeline(subplate_no="HA-1", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-1_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/raw_vector.fa", output_path="./HA-1_res")
+    process_pipeline(subplate_no="HA-2", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-2_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-2.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/raw_vector.fa", output_path="/home/wayne/Project/SC/Sanger/0911//HA-2_res")
