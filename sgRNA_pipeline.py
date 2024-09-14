@@ -8,10 +8,25 @@ import pandas as pd
 
 prefix = ''
 
-def cut_seq_obtain_pos(vector_seq: str) -> list:
-    '''根据原始载体构建sgRNA位置列表以及载体不含sgRNA的切片列表'''
-    for v in SeqIO.parse(vector_seq, 'fasta'):
-        vector_seq = str(v.seq)
+def cut_seq_obtain_pos(seq_path: str) -> list:
+    '''根据原始载体构建sgRNA位置列表以及载体不含sgRNA的切片列表和元件位置字典'''
+    # for v in SeqIO.parse(vector_seq, 'fasta'):
+    #     vector_seq = str(v.seq)
+    vector_seq: str = ''
+    feature_dict = {}
+    for record in SeqIO.parse(seq_path, 'genbank'):
+        for feature in record.features:
+            start = int(feature.location.start)
+            end = int(feature.location.end)
+            
+            # 如果 feature 有 /label，则存入字典
+            if "label" in feature.qualifiers:
+                label = feature.qualifiers['label'][0]
+                # 将位置范围作为键，label 作为值存入字典
+                feature_dict[(start, end)] = label
+        vector_seq = str(record.seq)
+
+    
     vector_li = vector_seq.split("N" * 20)
     # record sgRNA pos by strlen
     sg_pos_li = []
@@ -24,7 +39,20 @@ def cut_seq_obtain_pos(vector_seq: str) -> list:
         sg_pos_li.append(front_length)
         front_length += 20
 
-    return sg_pos_li, vector_li
+    return sg_pos_li, vector_li, feature_dict
+
+def find_label_by_position(feature_dict: dict, position: int) -> str:
+    """
+    根据输入的位置从字典中查找对应的 /label。
+
+    :param feature_dict: feature 位置信息和 /label 的字典
+    :param position: 输入的位置（从 0 开始）
+    :return: 对应位置的 label，若未找到则返回 "No label found."
+    """
+    for (start, end), label in feature_dict.items():
+        if start <= position <= end:
+            return label
+    return "-"
 
 
 def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
@@ -85,7 +113,7 @@ def well2subplate(well:int) -> str:
 
 
 
-def recognized_well_by_file_name(file_name: str = "HA-2-1-A01") -> int:
+def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
     '''根据文件名对应的子板及孔位获取拆分前的孔号'''
 
     sub_dict = defaultdict(list)
@@ -188,7 +216,7 @@ def extract_data(trim_start:int, trim_end:int, well_qc_dict:defaultdict, well_fq
             output_handle.write(fq_str)
 
 
-def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detective_end:int) -> None:
+def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detective_end:int, feature_dict:dict) -> None:
     '''检查错配数目,等于1报点,大于1报错'''
     all_snp_count = sum(aln.get_cigar_stats()[0][1:])
     if all_snp_count > 1:   
@@ -201,8 +229,10 @@ def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detec
         md_snp_idx = md_tag.find('A') + 1 or md_tag.find('G') + 1 or md_tag.find('C') + 1 or md_tag.find('T') + 1
         forward_len =  int(md_tag[:md_snp_idx - 1])
         pos = aln.reference_start + forward_len
-        if pos < detective_end:
-            well_qc_dict[well]['mismatch'].append(pos)
+        component = find_label_by_position(feature_dict, pos)
+        mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
+        if pos < detective_end and mismatch_str not in well_qc_dict[well]['mismatch']:
+            well_qc_dict[well]['mismatch'].append(f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}")
     # else:
     #     well_qc_dict[well]['mismatch'] = '0'
 
@@ -232,7 +262,7 @@ def coverage_check(cov_start: int, cov_end: int, aln_region_li:list) -> bool:
     return True
     
 
-def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict, well_ref_dict:defaultdict) -> None:
+def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict, well_ref_dict:defaultdict, feature_dict: dict) -> None:
     '''处理比对的结果'''
     well = int(Path(output_bam).name.split(".")[0].split("_")[-1])
     well_qc_dict[well]['sgRNA'] = [0] * 4
@@ -242,7 +272,7 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
         # skip supplementary and secondary
         if aln.is_supplementary or aln.is_secondary:continue
         # mismatch check
-        if mismatch_check(well, aln, well_qc_dict, sg_pos_li[-1] + 100):continue
+        if mismatch_check(well, aln, well_qc_dict, sg_pos_li[-1] + 100, feature_dict):continue
         # sgRNA detective
         cover_idx_li: list[int] = sgRNA_detective(well,well_ref_dict,
             aln, sg_pos_li)
@@ -253,13 +283,13 @@ def parse_alignment_result(output_bam: str, sg_pos_li: list, well_qc_dict: defau
     if coverage_check(5914, sg_pos_li[-1] + 150, aln_region_li):well_qc_dict[well]['coverage'] = 1
 
 
-def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict, well_ref_dict:defaultdict) -> None:
+def process_alignment(ref_file: str, input_fq: str, output_bam: str, sg_pos_li: list, well_qc_dict: defaultdict, well_ref_dict:defaultdict, feature_dict: dict) -> None:
     '''执行bwa命令后处理bam文件'''
     # alignment by bwa and fetch alignment result
     if not Path(output_bam).exists():system(f"bwa mem -t 24 {ref_file} {input_fq} > {output_bam}")
 
     # process alignment result
-    parse_alignment_result(output_bam, sg_pos_li, well_qc_dict, well_ref_dict)
+    parse_alignment_result(output_bam, sg_pos_li, well_qc_dict, well_ref_dict, feature_dict)
 
 
 def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, output_table: str) -> None:
@@ -278,22 +308,26 @@ def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, outpu
             [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" +mis_out + "\t" + str(len(well_qc_dict[well]['indel_soft'])) + "\n"
         out_table_handle.write(well_qc_str)
 
+def pack_ref(output_path:str, output_ref_path:str, output_ref_pack_path:str):
+    system(f"cp {output_ref_path}/*fa {output_ref_pack_path}/ && tar -cvf {output_path}/ref_pack.tar {output_ref_pack_path} > /dev/null")
 
 def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_path:str, sgRNA_table_path:str, input_path:str, output_path:str) -> None:
     # mkdir and get subplate
     output_fq_path = f"{output_path}/fq/"
     output_ref_path = f"{output_path}/ref/"
+    output_ref_pack_path = f"{output_path}/ref_pack/"
     output_bam_path = f"{output_path}/bam/"
-    for dir in [output_fq_path, output_ref_path, output_bam_path]:
+    for dir in [output_fq_path, output_ref_path, output_bam_path, output_ref_pack_path]:
         Path(dir).mkdir(exist_ok=1,parents=1)
     global prefix
     prefix = subplate_no
     
     # construct reference of each well
-    sg_pos_li, vector_li = cut_seq_obtain_pos(raw_vector_path)
+    sg_pos_li, vector_li, feature_dict = cut_seq_obtain_pos(raw_vector_path)
     well_ref_dict = generate_ref(sgRNA_table_path,
                  vector_li, output_ref_path)
     
+    pack_ref(output_path, output_ref_path, output_ref_pack_path)
     # sanger file process
     file_dict = classify_file_by_well(input_path)
     well_qc_dict = defaultdict(lambda: defaultdict(list))
@@ -305,9 +339,9 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
         ref_file = f"{output_ref_path}/{well2subplate(int(well))}_{well}.fa"
         input_fq = str(fq)
         output_bam = f"{output_bam_path}/{well2subplate(int(well))}_{well}.bam"
-        process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict, well_ref_dict)
+        process_alignment(ref_file, input_fq, output_bam, sg_pos_li, well_qc_dict, well_ref_dict, feature_dict)
     qc_dict_to_table(well_qc_dict, well_ref_dict, f"{output_path}/{subplate_no}_res.tsv")
 
 
 if __name__ == "__main__":
-    process_pipeline(subplate_no="HA-2", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-2_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-2.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/raw_vector.fa", output_path="/home/wayne/Project/SC/Sanger/0911//HA-2_res")
+    process_pipeline(subplate_no="HA-1", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-1_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb", output_path="/home/wayne/Project/SC/Sanger/0911//HA-1_res")
