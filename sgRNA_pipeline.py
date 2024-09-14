@@ -269,10 +269,10 @@ def qc_dict_to_table(well_qc_dict: defaultdict, well_ref_dict:defaultdict, outpu
     for well in sorted(well_qc_dict.keys(),key=lambda well:well2subplate(int(well))):
         mis_out = '0'
         if not well_qc_dict[well]['coverage']:mis_out = '-'
-        if len(well_qc_dict[well]['mismatch']) > 1 and well_qc_dict[well]['coverage']:
-            mis_out = '1+'
-        elif len(well_qc_dict[well]['mismatch']) == 1 and well_qc_dict[well]['coverage']:
-            mis_out = str(well_qc_dict[well]['mismatch'][0])
+        if len(well_qc_dict[well]['mismatch']) >= 1 and well_qc_dict[well]['coverage']:
+            mis_out = ",".join([str(x) for x in well_qc_dict[well]['mismatch']])
+        # elif len(well_qc_dict[well]['mismatch']) == 1 and well_qc_dict[well]['coverage']:
+        #     mis_out = str(well_qc_dict[well]['mismatch'][0])
         all_detective = not 0 in well_qc_dict[well]['sgRNA']
         well_qc_str = well2subplate(int(well)) + "\t" + str(well) + "\t" + "\t".join(
             [str(x) for x in well_qc_dict[well]['sgRNA']]) + "\t" + str(all_detective) + "\t" + str(well_qc_dict[well]['coverage']) + "\t" + str(len(well_qc_dict[well]['qc_failed'])) + "\t" +mis_out + "\t" + str(len(well_qc_dict[well]['indel_soft'])) + "\n"
