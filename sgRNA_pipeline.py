@@ -113,7 +113,7 @@ def well2subplate(well:int) -> str:
 
 
 
-def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
+def recognized_well_by_file_name(file_name: str = "HA-3-1-A01") -> int:
     '''根据文件名对应的子板及孔位获取拆分前的孔号'''
 
     sub_dict = defaultdict(list)
@@ -344,4 +344,4 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
 
 
 if __name__ == "__main__":
-    process_pipeline(subplate_no="HA-1", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-1_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb", output_path="/home/wayne/Project/SC/Sanger/0911//HA-1_res")
+    process_pipeline(subplate_no="HA-3", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-3_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-3.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb", output_path="/home/wayne/Project/SC/Sanger/0911//HA-3_res")
