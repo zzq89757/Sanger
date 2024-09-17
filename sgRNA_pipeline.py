@@ -228,6 +228,11 @@ def extract_data(
             output_handle.write(fq_str)
 
 
+def stop_codon_check(segment: str, well_qc_dict: defaultdict) -> None:
+    '''检测突变后的碱基是否导致终止密码子的产生'''
+    ...
+
+
 def mismatch_check(
     well: int,
     aln: AlignedSegment,
