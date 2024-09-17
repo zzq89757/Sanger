@@ -234,13 +234,13 @@ def mismatch_check(
     well_qc_dict: defaultdict,
     detective_end: int,
     feature_dict: dict,
-) -> None:
+) -> bool:
     """检查错配数目,等于1报点,大于1报错"""
     all_snp_count = sum(aln.get_cigar_stats()[0][1:])
     if all_snp_count > 1:
         print(f"{aln.query_name} has mismatch or softclip !!!")
         well_qc_dict[well]["indel_soft"] += [1]
-        return 1
+        return True
     elif all_snp_count == 1:
         # get snp position
         md_tag = aln.get_tag("MD")
@@ -260,6 +260,7 @@ def mismatch_check(
             )
     # else:
     #     well_qc_dict[well]['mismatch'] = '0'
+    return False
 
 
 def sgRNA_detective(
