@@ -113,7 +113,7 @@ def well2subplate(well:int) -> str:
 
 
 
-def recognized_well_by_file_name(file_name: str = "HA-3-1-A01") -> int:
+def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
     '''根据文件名对应的子板及孔位获取拆分前的孔号'''
 
     sub_dict = defaultdict(list)
@@ -229,7 +229,7 @@ def mismatch_check(well:int, aln:AlignedSegment, well_qc_dict:defaultdict, detec
         md_snp_idx = md_tag.find('A') + 1 or md_tag.find('G') + 1 or md_tag.find('C') + 1 or md_tag.find('T') + 1
         forward_len =  int(md_tag[:md_snp_idx - 1])
         pos = aln.reference_start + forward_len
-        component = find_label_by_position(feature_dict, pos)
+        component = find_label_by_position(feature_dict, pos + 1)
         mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
         if pos < detective_end and mismatch_str not in well_qc_dict[well]['mismatch']:
             well_qc_dict[well]['mismatch'].append(f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}")
@@ -245,7 +245,8 @@ def sgRNA_detective(well: int, well_ref_dict:defaultdict, aln:AlignedSegment, sg
     ref = well_ref_dict[well]
     q_start = aln.reference_start
     for idx, pos in enumerate(sg_pos_li):
-        if aln.query_alignment_sequence[pos - q_start:pos - q_start + 20].upper() == ref[pos:pos + 20].upper():
+        if well == 184:print(aln.query_sequence[pos - q_start:pos - q_start + 20])
+        if aln.query_sequence[pos - q_start:pos - q_start + 20].upper() == ref[pos:pos + 20].upper():
             sgRNA_cover_idx_li.append(idx)
 
     return sgRNA_cover_idx_li
@@ -344,4 +345,4 @@ def process_pipeline(subplate_no:str, trim_start:int, trim_end:int, raw_vector_p
 
 
 if __name__ == "__main__":
-    process_pipeline(subplate_no="HA-3", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-3_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-3.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb", output_path="/home/wayne/Project/SC/Sanger/0911//HA-3_res")
+    process_pipeline(subplate_no="HA-1", trim_start=50, trim_end=800, input_path="/home/wayne/Project/SC/Sanger/0911/HA-1_raw/", sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx", raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb", output_path="/home/wayne/Project/SC/Sanger/0911//HA-1_res")
