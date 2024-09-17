@@ -228,9 +228,17 @@ def extract_data(
             output_handle.write(fq_str)
 
 
-def stop_codon_check(segment: str, well_qc_dict: defaultdict) -> None:
+def stop_codon_check(well: int, segment: str, well_qc_dict: defaultdict) -> None:
     '''检测突变后的碱基是否导致终止密码子的产生'''
-    ...
+    stop_codon_li = [
+        ''
+    ]
+    
+    for i in range(3):
+        codon = segment[i: i + 3]
+        if codon in stop_codon_li:
+            well_qc_dict[well]['stop_codon_from_snp'] = [1]
+        
 
 
 def mismatch_check(
@@ -260,6 +268,9 @@ def mismatch_check(
         component = find_label_by_position(feature_dict, pos + 1)
         mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
         if pos < detective_end and mismatch_str not in well_qc_dict[well]["mismatch"]:
+            # stop codon check
+            # print(aln.query_name)
+            stop_codon_check(aln.query_alignment_sequence[forward_len -2 : forward_len + 3], well_qc_dict)
             well_qc_dict[well]["mismatch"].append(
                 f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
             )
