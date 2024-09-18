@@ -232,6 +232,10 @@ def stop_codon_check(well: int, segment: str, well_qc_dict: defaultdict) -> None
     """检测突变后的碱基是否导致终止密码子的产生"""
     stop_codon_li = ["UAA", "UAG", "UGA"]
     # stop codon detective by ORF start and SNP position 
+    
+    # if not in cds, continue
+    
+    # in cds, get ORF and codon after mutation
     for i in range(3):
         codon = segment[i : i + 3]
         # in stop codon li and in cds
