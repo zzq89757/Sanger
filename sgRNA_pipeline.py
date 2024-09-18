@@ -135,6 +135,7 @@ def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
     # subplate, raw_num, col_num = file_name.split("-")[-3:]
     subplate, raw_col = file_name.split("-")[2:4]
     raw_num = raw_col[0]
+    print(file_name.split("-")[2:4])
     col_num = int(raw_col[1:])
     raw_num = ord(raw_num) - 65
     sub_well_idx = raw_num * 12 + int(col_num) - 1
@@ -459,11 +460,11 @@ def process_pipeline(
 
 if __name__ == "__main__":
     process_pipeline(
-        subplate_no="HA-1",
+        subplate_no="HA-4",
         trim_start=50,
         trim_end=800,
-        input_path="/home/wayne/Project/SC/Sanger/0911/HA-1_raw/",
-        sgRNA_table_path="/home/wayne/Project/SC/Sanger/HA-1.xlsx",
+        input_path="/home/wayne/Project/SC/Sanger/0918_test/HA-4-1/",
+        sgRNA_table_path="/home/wayne/Project/SC/Sanger/0918_test/HA-4-1/HA-4.xlsx",
         raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb",
-        output_path="/home/wayne/Project/SC/Sanger/0911//HA-1_res",
+        output_path="/home/wayne/Project/SC/Sanger/0918_test/HA-4-1///HA-4_res",
     )
