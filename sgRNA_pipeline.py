@@ -231,10 +231,10 @@ def extract_data(
 def stop_codon_check(well: int, segment: str, well_qc_dict: defaultdict) -> None:
     """检测突变后的碱基是否导致终止密码子的产生"""
     stop_codon_li = ["UAA", "UAG", "UGA"]
-    # stop codon detective by ORF start and SNP position 
-    
+    # stop codon detective by ORF start and SNP position
+
     # if not in cds, continue
-    
+
     # in cds, get ORF and codon after mutation
     for i in range(3):
         codon = segment[i : i + 3]
@@ -268,7 +268,7 @@ def mismatch_check(
         forward_len = int(md_tag[: md_snp_idx - 1])
         pos = aln.reference_start + forward_len + 1
         component = find_label_by_position(feature_dict, pos)
-        mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
+        mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx - 1]}->{aln.query_alignment_sequence[forward_len]}"
         if pos < detective_end and mismatch_str not in well_qc_dict[well]["mismatch"]:
             # stop codon check
             # print(aln.query_name)
