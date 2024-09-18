@@ -231,11 +231,14 @@ def extract_data(
 def stop_codon_check(well: int, segment: str, well_qc_dict: defaultdict) -> None:
     '''检测突变后的碱基是否导致终止密码子的产生'''
     stop_codon_li = [
-        ''
+        'UAA', 
+        'UAG', 
+        'UGA'
     ]
     
     for i in range(3):
         codon = segment[i: i + 3]
+        # in stop codon li and in cds
         if codon in stop_codon_li:
             well_qc_dict[well]['stop_codon_from_snp'] = [1]
         
