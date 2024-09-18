@@ -266,8 +266,8 @@ def mismatch_check(
             or md_tag.find("T") + 1
         )
         forward_len = int(md_tag[: md_snp_idx - 1])
-        pos = aln.reference_start + forward_len
-        component = find_label_by_position(feature_dict, pos + 1)
+        pos = aln.reference_start + forward_len + 1
+        component = find_label_by_position(feature_dict, pos)
         mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
         if pos < detective_end and mismatch_str not in well_qc_dict[well]["mismatch"]:
             # stop codon check
