@@ -405,10 +405,10 @@ def qc_dict_to_table(
         mis_out = "0"
         if not well_qc_dict[well]["coverage"]:
             mis_out = "-"
-        if len(well_qc_dict[well]["mismatch"]) >= 1 and well_qc_dict[well]["coverage"]:
+        if len(well_qc_dict[well]["mismatch"]) <= 5 and well_qc_dict[well]["coverage"]:
             mis_out = ",".join([str(x) for x in well_qc_dict[well]["mismatch"]])
-        # elif len(well_qc_dict[well]['mismatch']) == 1 and well_qc_dict[well]['coverage']:
-        #     mis_out = str(well_qc_dict[well]['mismatch'][0])
+        elif len(well_qc_dict[well]['mismatch']) > 5 and well_qc_dict[well]['coverage']:
+            mis_out = "5+"
         all_detective = not 0 in well_qc_dict[well]["sgRNA"]
         well_qc_str = (
             well2subplate(int(well))
