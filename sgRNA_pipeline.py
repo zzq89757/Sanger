@@ -227,6 +227,47 @@ def extract_data(
         for file in file_li:
             fq_str = fq_from_abi(trim_start, trim_end, well_qc_dict, file)
             output_handle.write(fq_str)
+            
+            
+def found_mismatch_by_md_tag(
+    well: int,
+    aln: AlignedSegment,
+    well_qc_dict: defaultdict,
+    detective_end: int,
+    feature_dict: dict,
+) -> bool:
+    md_str = aln.get_tag("MD")
+    
+    forward_length = ''
+    abs_pos = aln.reference_start
+    forward_sum = 0
+    for i in md_str:
+        # obtain ascii code 
+        if ord(i) <= 65: # 0~9
+            forward_length += i
+        else:
+            # current snp position and label
+            abs_pos += int(forward_length) + 1
+            forward_sum += int(forward_length)
+            component = find_label_by_position(feature_dict, abs_pos)
+            # 
+            mismatch_str = f"{abs_pos}<{component}>:{i}->{aln.query_alignment_sequence[forward_sum]}"
+            if abs_pos < detective_end and mismatch_str not in well_qc_dict[well]["mismatch"]:
+                # stop codon check
+                # print(aln.query_name)
+                stop_codon_check(
+                    aln.query_alignment_sequence[forward_sum - 2 : forward_sum + 3],
+                    well_qc_dict,
+                )
+                well_qc_dict[well]["mismatch"].append(
+                    f"{abs_pos}<{component}>:{i}->{aln.query_alignment_sequence[forward_sum]}"
+                )
+            forward_sum += 1
+        
+             
+    
+    
+
 
 
 def stop_codon_check(well: int, segment: str, well_qc_dict: defaultdict) -> None:
@@ -252,36 +293,23 @@ def mismatch_check(
     feature_dict: dict,
 ) -> bool:
     """检查错配数目,等于1报点,大于1报错"""
-    all_snp_count = sum(aln.get_cigar_stats()[0][1:])
-    if all_snp_count > 1:
-        print(f"{aln.query_name} has mismatch or softclip !!!")
-        well_qc_dict[well]["indel_soft"] += [1]
+    all_snp_count = sum(aln.get_cigar_stats()[0][1:5])
+    # if indel 
+    indel_num = sum(aln.get_cigar_stats()[0][1:3])
+    if indel_num:
+        print(f"{aln.query_name} has indel !!!")
+        well_qc_dict[well]["indel"] += [1]
         return True
-    elif all_snp_count == 1:
-        # get snp position
-        md_tag = aln.get_tag("MD")
-        md_snp_idx = (
-            md_tag.find("A") + 1
-            or md_tag.find("G") + 1
-            or md_tag.find("C") + 1
-            or md_tag.find("T") + 1
-        )
-        forward_len = int(md_tag[: md_snp_idx - 1])
-        pos = aln.reference_start + forward_len + 1
-        component = find_label_by_position(feature_dict, pos)
-        mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx - 1]}->{aln.query_alignment_sequence[forward_len]}"
-        if pos < detective_end and mismatch_str not in well_qc_dict[well]["mismatch"]:
-            # stop codon check
-            # print(aln.query_name)
-            stop_codon_check(
-                aln.query_alignment_sequence[forward_len - 2 : forward_len + 3],
-                well_qc_dict,
-            )
-            well_qc_dict[well]["mismatch"].append(
-                f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
-            )
-    # else:
-    #     well_qc_dict[well]['mismatch'] = '0'
+    # if softclip
+    soft_num = aln.get_cigar_stats()[0][4]
+    if soft_num:
+        print(f"{aln.query_name} has softclip !!!")
+        well_qc_dict[well]["softclip"] += [1]
+        return True
+    
+    # mismatch found
+    found_mismatch_by_md_tag(well, aln, well_qc_dict, detective_end, feature_dict)
+    
     return False
 
 
