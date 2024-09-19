@@ -16,7 +16,7 @@ def found_mismatch_by_md_tag(
     forward_sum = 0
     for i in md_str:
         # obtain ascii code 
-        if ord(i) <= 65: # 0~9
+        if ord(i) < 65: # 0~9
             forward_length += i
         else:
             # current snp position and label

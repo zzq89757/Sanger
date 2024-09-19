@@ -135,7 +135,7 @@ def recognized_well_by_file_name(file_name: str = "HA-1-1-A01") -> int:
     # subplate, raw_num, col_num = file_name.split("-")[-3:]
     subplate, raw_col = file_name.split("-")[2:4]
     raw_num = raw_col[0]
-    print(file_name.split("-")[2:4])
+    # print(file_name.split("-")[2:4])
     col_num = int(raw_col[1:])
     raw_num = ord(raw_num) - 65
     sub_well_idx = raw_num * 12 + int(col_num) - 1
@@ -243,22 +243,23 @@ def found_mismatch_by_md_tag(
     forward_sum = 0
     for i in md_str:
         # obtain ascii code 
-        if ord(i) <= 65: # 0~9
+        if ord(i) < 65: # 0~9
             forward_length += i
         else:
             # current snp position and label
             abs_pos += int(forward_length) + 1
             forward_sum += int(forward_length)
+            forward_length = ''
             component = find_label_by_position(feature_dict, abs_pos)
             # 
             mismatch_str = f"{abs_pos}<{component}>:{i}->{aln.query_alignment_sequence[forward_sum]}"
             if abs_pos < detective_end and mismatch_str not in well_qc_dict[well]["mismatch"]:
                 # stop codon check
                 # print(aln.query_name)
-                stop_codon_check(
-                    aln.query_alignment_sequence[forward_sum - 2 : forward_sum + 3],
-                    well_qc_dict,
-                )
+                # stop_codon_check(
+                #     aln.query_alignment_sequence[forward_sum - 2 : forward_sum + 3],
+                #     well_qc_dict,
+                # )
                 well_qc_dict[well]["mismatch"].append(
                     f"{abs_pos}<{component}>:{i}->{aln.query_alignment_sequence[forward_sum]}"
                 )
@@ -321,8 +322,8 @@ def sgRNA_detective(
     ref = well_ref_dict[well]
     q_start = aln.reference_start
     for idx, pos in enumerate(sg_pos_li):
-        if well == 184:
-            print(aln.query_sequence[pos - q_start : pos - q_start + 20])
+        # if well == 184:
+        #     print(aln.query_sequence[pos - q_start : pos - q_start + 20])
         if (
             aln.query_sequence[pos - q_start : pos - q_start + 20].upper()
             == ref[pos : pos + 20].upper()
