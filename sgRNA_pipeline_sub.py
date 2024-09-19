@@ -188,7 +188,7 @@ def generate_fq(
         output_handle.write(fq_str)
 
 
-def stop_codon_check(sub_cycle_info: str, segment: str, well_qc_dict: defaultdict) -> None:
+def stop_codon_check(sub_cycle_info: str, segment: str, well_qc_dict: defaultdict, orf_start: int) -> None:
     """检测突变后的碱基是否导致终止密码子的产生"""
     stop_codon_li = ["UAA", "UAG", "UGA"]
     # stop codon detective by ORF start and SNP position
@@ -236,6 +236,7 @@ def mismatch_check(
                 sub_cycle_info,
                 aln.query_alignment_sequence[forward_len - 2 : forward_len + 3],
                 well_qc_dict,
+                1
             )
             well_qc_dict[sub_cycle_info]["mismatch"].append(
                 f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
