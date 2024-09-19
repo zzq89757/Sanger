@@ -102,7 +102,6 @@ def recognized_well_by_file_name(file_name: str = "HA-1-4-A01-P1_A01#2.ab1") -> 
                 else:
                     sub_dict["4"].append((i - 1) * 24 + j)
 
-    # subplate, raw_num, col_num = file_name.split("-")[-3:]
     subplate, raw_col = file_name.split("#")[0].split("_")[0].split("-")[2:4]
     raw_num = raw_col[0]
     col_num = int(raw_col[1:])
@@ -114,7 +113,6 @@ def recognized_well_by_file_name(file_name: str = "HA-1-4-A01-P1_A01#2.ab1") -> 
 
 def trim_static(seq_record, start: int = 50, end: int = 800) -> list:
     """裁剪下机数据,固定保留50-800部分"""
-    # return seq_record.seq[50:800], "F" * 750
     return [
         seq_record.seq[start:end],
         seq_record.letter_annotations["phred_quality"][start:end],
@@ -231,7 +229,6 @@ def mismatch_check(
         mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx - 1]}->{aln.query_alignment_sequence[forward_len]}"
         if pos < detective_end and mismatch_str not in well_qc_dict[sub_cycle_info]["mismatch"]:
             # stop codon check
-            # print(aln.query_name)
             stop_codon_check(
                 sub_cycle_info,
                 aln.query_alignment_sequence[forward_len - 2 : forward_len + 3],
@@ -331,22 +328,14 @@ def qc_dict_to_table(
     out_table_handle.write(
         "Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel_soft\n"
     )
-    # print(well_qc_dict.keys())
-    # for i in well_qc_dict.keys():
-    #     print(i)
-    #     recognized_well_by_file_name(i)
-    # exit()
-    # for sub_name in sorted(well_qc_dict.keys(), key=lambda sub_name: recognized_well_by_file_name(sub_name)):   
+  
     for sub_name in sorted(well_qc_dict.keys(), key=lambda sub_name: sub_name):   
-        # print(sub_name)
-        # continue
         mis_out = "0"
         if not well_qc_dict[sub_name]["coverage"]:
             mis_out = "-"
         if len(well_qc_dict[sub_name]["mismatch"]) >= 1 and well_qc_dict[sub_name]["coverage"]:
             mis_out = ",".join([str(x) for x in well_qc_dict[sub_name]["mismatch"]])
-        # elif len(well_qc_dict[well]['mismatch']) == 1 and well_qc_dict[well]['coverage']:
-        #     mis_out = str(well_qc_dict[well]['mismatch'][0])
+
         all_detective = not 0 in well_qc_dict[sub_name]["sgRNA"]
         well_qc_str = (
             sub_name
@@ -397,7 +386,6 @@ def process_pipeline(
 
     pack_ref(output_path, output_ref_path, output_ref_pack_path)
     # sanger file process
-    # file_dict = classify_file_by_well(input_path)
     well_qc_dict = defaultdict(lambda: defaultdict(list))
     generate_fq(trim_start, trim_end, well_qc_dict, input_path, output_fq_path)
 
