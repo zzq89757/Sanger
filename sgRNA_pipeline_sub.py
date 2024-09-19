@@ -130,7 +130,7 @@ def trimmed_qual_qc(qc_array) -> bool:
 
 def fq_from_abi(
     trim_start: int, trim_end: int, well_qc_dict: defaultdict, file_path: str
-) -> defaultdict:
+) -> str:
     """读取ab1文件并将序列信息存入fq格式字符串"""
     fq_str = ""
     for seq in SeqIO.parse(file_path, "abi"):
@@ -375,7 +375,7 @@ def qc_dict_to_table(well_qc_dict: defaultdict, output_table: str) -> None:
         out_table_handle.write(well_qc_str)
 
 
-def pack_ref(output_path: str, output_ref_path: str, output_ref_pack_path: str):
+def pack_ref(output_path: str, output_ref_path: str, output_ref_pack_path: str) -> None:
     system(
         f"cp {output_ref_path}/*fa {output_ref_pack_path}/ && tar -cvf {output_path}/ref_pack.tar {output_ref_pack_path} > /dev/null"
     )
