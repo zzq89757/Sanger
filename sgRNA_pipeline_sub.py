@@ -184,20 +184,33 @@ def generate_fq(
 
 
 def stop_codon_check(
-    sub_cycle_info: str, segment: str, well_qc_dict: defaultdict, orf_start: int
+    sub_cycle_info: str,
+    mutation_pos: int,
+    updown2bp: str,
+    well_qc_dict: defaultdict,
+    orf_start: int,
 ) -> None:
     """检测突变后的碱基是否导致终止密码子的产生"""
-    stop_codon_li = ["UAA", "UAG", "UGA"]
+    stop_codon_li = ["TAA", "TAG", "TGA"]
+    codon = ""
     # stop codon detective by ORF start and SNP position
+    relative_pos = mutation_pos - orf_start
 
     # if not in cds, continue
+    if relative_pos < 0:
+        return
 
     # in cds, get ORF and codon after mutation
-    for i in range(3):
-        codon = segment[i : i + 3]
-        # in stop codon li and in cds
-        if codon in stop_codon_li:
-            well_qc_dict[sub_cycle_info]["stop_codon_from_snp"] = [1]
+    if relative_pos % 3 == 0:
+        codon = updown2bp[0:3]
+    elif relative_pos % 3 == 1:
+        codon = updown2bp[2:5]
+    else:
+        codon = updown2bp[1:4]
+
+    # if in stop codon li
+    if codon in stop_codon_li:
+        well_qc_dict[sub_cycle_info]["stop_codon_from_snp"] = [1]
 
 
 def mismatch_check(
@@ -233,6 +246,7 @@ def mismatch_check(
             # stop codon check
             stop_codon_check(
                 sub_cycle_info,
+                pos,
                 aln.query_alignment_sequence[forward_len - 2 : forward_len + 3],
                 well_qc_dict,
                 1,
@@ -324,7 +338,7 @@ def qc_dict_to_table(well_qc_dict: defaultdict, output_table: str) -> None:
     """将包含qc信息的dict转为表格并存储为文件"""
     out_table_handle = open(output_table, "w")
     out_table_handle.write(
-        "Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel_soft\n"
+        "Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel_soft\tstop_codon_from_snp\n"
     )
 
     for sub_name in sorted(well_qc_dict.keys(), key=lambda sub_name: sub_name):
@@ -354,6 +368,8 @@ def qc_dict_to_table(well_qc_dict: defaultdict, output_table: str) -> None:
             + mis_out
             + "\t"
             + str(len(well_qc_dict[sub_name]["indel_soft"]))
+            + "\t"
+            + str(len(well_qc_dict[sub_name]["stop_codon_from_snp"]))
             + "\n"
         )
         out_table_handle.write(well_qc_str)
