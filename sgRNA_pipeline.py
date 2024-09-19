@@ -399,7 +399,7 @@ def qc_dict_to_table(
     """将包含qc信息的dict转为表格并存储为文件"""
     out_table_handle = open(output_table, "w")
     out_table_handle.write(
-        "Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel_soft\n"
+        "Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel\tsoft\n"
     )
     for well in sorted(well_qc_dict.keys(), key=lambda well: well2subplate(int(well))):
         mis_out = "0"
@@ -425,7 +425,9 @@ def qc_dict_to_table(
             + "\t"
             + mis_out
             + "\t"
-            + str(len(well_qc_dict[well]["indel_soft"]))
+            + str(len(well_qc_dict[well]["indel"]))
+            + "\t"
+            + str(len(well_qc_dict[well]["softclip"]))
             + "\n"
         )
         out_table_handle.write(well_qc_str)
