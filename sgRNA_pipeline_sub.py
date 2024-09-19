@@ -82,8 +82,8 @@ def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
     return well_ref_dict
 
 
-def recognized_well_by_file_name(file_name: str = "HA-1-4-A01-P1_A01#2.ab1") -> int:
-    """根据文件名对应的子板及孔位获取拆分前的孔号"""
+def recognized_well_by_sub_info(file_name: str = "HA-1-4-A01-P1_A01#2.ab1") -> int:
+    """根据子板及孔位获取拆分前的孔号"""
 
     sub_dict = defaultdict(list)
     for i in range(1, 17):
@@ -177,7 +177,7 @@ def generate_fq(
         subplate = "-".join(prefix_li[:4])
         pcr_cycle = "" if len(prefix_li) < 6 else f"#{prefix_li[5]}"
         sub_cycle_info = subplate + pcr_cycle
-        well = recognized_well_by_file_name(subplate)
+        well = recognized_well_by_sub_info(subplate)
         output_handle = open(f"{output_fq_path}/{sub_cycle_info}_{well}.fq", "a")
         fq_str = fq_from_abi(trim_start, trim_end, well_qc_dict, file)
         output_handle.write(fq_str)
@@ -355,7 +355,7 @@ def qc_dict_to_table(well_qc_dict: defaultdict, output_table: str) -> None:
         well_qc_str = (
             sub_name
             + "\t"
-            + str(recognized_well_by_file_name(sub_name))
+            + str(recognized_well_by_sub_info(sub_name))
             + "\t"
             + "\t".join([str(x) for x in well_qc_dict[sub_name]["sgRNA"]])
             + "\t"
