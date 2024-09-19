@@ -64,7 +64,7 @@ def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
         sg_df["Plate #"], sg_df["Well #"], sg_df["sgRNA sequence"], sg_df["Strand"]
     ):
         plate, sg_idx = plate_str.split("_sg")
-        plate: str = plate.upper().replace('TF','').replace('_','-')
+        plate: str = plate.upper().replace("TF", "").replace("_", "-")
         tmp_li[int(sg_idx) - 1] = vector_li[int(sg_idx) - 1] + sgn_seq
         if idx % 4 == 0:
             tmp_li[4] = vector_li[4]
@@ -80,9 +80,6 @@ def generate_ref(sg_table: str, vector_li: list, ref_path: str) -> defaultdict:
             tmp_li = [""] * 5
         idx += 1
     return well_ref_dict
-
-
-
 
 
 def recognized_well_by_file_name(file_name: str = "HA-1-4-A01-P1_A01#2.ab1") -> int:
@@ -139,7 +136,7 @@ def fq_from_abi(
     for seq in SeqIO.parse(file_path, "abi"):
         prefix_li = str(seq.name).split("_")[0].split("-")
         subplate = "-".join(prefix_li[:4])
-        pcr_cycle = '' if len(prefix_li) < 6 else f"#{prefix_li[5]}"
+        pcr_cycle = "" if len(prefix_li) < 6 else f"#{prefix_li[5]}"
         sub_cycle_info = subplate + pcr_cycle
         seq_id = seq.name
         # base signal
@@ -178,7 +175,7 @@ def generate_fq(
     for file in file_li:
         prefix_li = file.name.split("_")[0].split("-")
         subplate = "-".join(prefix_li[:4])
-        pcr_cycle = '' if len(prefix_li) < 6 else f"#{prefix_li[5]}"
+        pcr_cycle = "" if len(prefix_li) < 6 else f"#{prefix_li[5]}"
         sub_cycle_info = subplate + pcr_cycle
         well = recognized_well_by_file_name(subplate)
         output_handle = open(f"{output_fq_path}/{sub_cycle_info}_{well}.fq", "a")
@@ -186,7 +183,9 @@ def generate_fq(
         output_handle.write(fq_str)
 
 
-def stop_codon_check(sub_cycle_info: str, segment: str, well_qc_dict: defaultdict, orf_start: int) -> None:
+def stop_codon_check(
+    sub_cycle_info: str, segment: str, well_qc_dict: defaultdict, orf_start: int
+) -> None:
     """检测突变后的碱基是否导致终止密码子的产生"""
     stop_codon_li = ["UAA", "UAG", "UGA"]
     # stop codon detective by ORF start and SNP position
@@ -227,13 +226,16 @@ def mismatch_check(
         pos = aln.reference_start + forward_len + 1
         component = find_label_by_position(feature_dict, pos)
         mismatch_str = f"{pos}<{component}>:{md_tag[md_snp_idx - 1]}->{aln.query_alignment_sequence[forward_len]}"
-        if pos < detective_end and mismatch_str not in well_qc_dict[sub_cycle_info]["mismatch"]:
+        if (
+            pos < detective_end
+            and mismatch_str not in well_qc_dict[sub_cycle_info]["mismatch"]
+        ):
             # stop codon check
             stop_codon_check(
                 sub_cycle_info,
                 aln.query_alignment_sequence[forward_len - 2 : forward_len + 3],
                 well_qc_dict,
-                1
+                1,
             )
             well_qc_dict[sub_cycle_info]["mismatch"].append(
                 f"{pos}<{component}>:{md_tag[md_snp_idx -1 ]}->{aln.query_alignment_sequence[forward_len]}"
@@ -243,9 +245,7 @@ def mismatch_check(
     return False
 
 
-def sgRNA_detective(
-    aln: AlignedSegment, sg_pos_li: list
-) -> list[int]:
+def sgRNA_detective(aln: AlignedSegment, sg_pos_li: list) -> list[int]:
     """比对结果覆盖到了第几条sgRNA"""
     sgRNA_cover_idx_li = []
     q_start = aln.reference_start
@@ -288,7 +288,9 @@ def parse_alignment_result(
         if aln.is_supplementary or aln.is_secondary:
             continue
         # mismatch check
-        if mismatch_check(sub_cycle_info, aln, well_qc_dict, sg_pos_li[-1] + 100, feature_dict):
+        if mismatch_check(
+            sub_cycle_info, aln, well_qc_dict, sg_pos_li[-1] + 100, feature_dict
+        ):
             continue
         # sgRNA detective
         cover_idx_li: list[int] = sgRNA_detective(aln, sg_pos_li)
@@ -315,25 +317,24 @@ def process_alignment(
         system(f"bwa mem -t 24 {ref_file} {input_fq} > {output_bam}")
 
     # process alignment result
-    parse_alignment_result(
-        output_bam, sg_pos_li, well_qc_dict, feature_dict
-    )
+    parse_alignment_result(output_bam, sg_pos_li, well_qc_dict, feature_dict)
 
 
-def qc_dict_to_table(
-    well_qc_dict: defaultdict, output_table: str
-) -> None:
+def qc_dict_to_table(well_qc_dict: defaultdict, output_table: str) -> None:
     """将包含qc信息的dict转为表格并存储为文件"""
     out_table_handle = open(output_table, "w")
     out_table_handle.write(
         "Subplate_well\tWell\tsgRNA1\tsgRNA2\tsgRNA3\tsgRNA4\tall_sgRNA\tcoverage\tqc_failed\tmismatch\tindel_soft\n"
     )
-  
-    for sub_name in sorted(well_qc_dict.keys(), key=lambda sub_name: sub_name):   
+
+    for sub_name in sorted(well_qc_dict.keys(), key=lambda sub_name: sub_name):
         mis_out = "0"
         if not well_qc_dict[sub_name]["coverage"]:
             mis_out = "-"
-        if len(well_qc_dict[sub_name]["mismatch"]) >= 1 and well_qc_dict[sub_name]["coverage"]:
+        if (
+            len(well_qc_dict[sub_name]["mismatch"]) >= 1
+            and well_qc_dict[sub_name]["coverage"]
+        ):
             mis_out = ",".join([str(x) for x in well_qc_dict[sub_name]["mismatch"]])
 
         all_detective = not 0 in well_qc_dict[sub_name]["sgRNA"]
@@ -397,7 +398,7 @@ def process_pipeline(
         plate = "-".join(sub_cycle_info.split("-")[:2])
         ref_file = f"{output_ref_path}/{plate}_{well}.fa"
         input_fq = str(fq)
-        bam_name = fq.name.replace("fq","bam")
+        bam_name = fq.name.replace("fq", "bam")
         output_bam = f"{output_bam_path}/{bam_name}"
         process_alignment(
             ref_file,
@@ -407,11 +408,7 @@ def process_pipeline(
             well_qc_dict,
             feature_dict,
         )
-    qc_dict_to_table(
-        well_qc_dict, f"{output_path}/res.tsv"
-    )
-
-
+    qc_dict_to_table(well_qc_dict, f"{output_path}/res.tsv")
 
 
 if __name__ == "__main__":
@@ -423,4 +420,3 @@ if __name__ == "__main__":
         raw_vector_path="/home/wayne/Project/SC/Sanger/pYJA5-4sgRNA.gb",
         output_path="/home/wayne/Project/SC/Sanger/subout/HA-4-1///HA-4_res",
     )
-    
